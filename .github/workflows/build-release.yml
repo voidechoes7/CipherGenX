@@ -110,12 +110,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
             libssl-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev
+            libgtk-3-dev
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -165,15 +164,16 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Android SDK & NDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android NDK 27
+      - name: Configure preinstalled Android SDK & NDK
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager "ndk;27.2.12479018" "platforms;android-34" "build-tools;34.0.0"
-          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
-          echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          SDK_DIR="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER=$(find "$SDK_DIR/cmdline-tools" -name sdkmanager -type f | sort -V | tail -n 1)
+          echo "Using sdkmanager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "ndk;27.2.12479018" "platforms;android-34" "build-tools;34.0.0"
+          echo "ANDROID_HOME=$SDK_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK_DIR" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$SDK_DIR/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
       - name: Setup Rust with Android targets
         uses: dtolnay/rust-toolchain@stable
@@ -231,24 +231,39 @@ jobs:
       - name: Initialize Tauri iOS project
         run: npx tauri ios init --ci
 
-      - name: Build unsigned iOS .app & package .ipa
+      - name: Disable code signing in generated Xcode project & build unsigned .ipa
         run: |
-          XCODE_PROJ=$(find src-tauri/gen/apple -maxdepth 2 -name "*.xcodeproj" | head -n 1)
-          SCHEME=$(xcodebuild -list -project "$XCODE_PROJ" | awk '/Schemes:/{getline; gsub(/^[ \t]+/, ""); print; exit}')
-          xcodebuild \
-            -project "$XCODE_PROJ" \
-            -scheme "$SCHEME" \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination "generic/platform=iOS" \
-            -derivedDataPath build/ios-derived \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            build
+          PBXPROJ=$(find src-tauri/gen/apple -maxdepth 3 -name "project.pbxproj" | head -n 1)
+          echo "Patching $PBXPROJ to disable code signing for unsigned IPA build..."
+          python3 - "$PBXPROJ" <<'PYEOF'
+          import sys, re
+          path = sys.argv[1]
+          with open(path, "r", encoding="utf-8") as f:
+              text = f.read()
+          text = re.sub(r'DEVELOPMENT_TEAM\s*=\s*[^;]+;', 'DEVELOPMENT_TEAM = "";', text)
+          text = re.sub(r'CODE_SIGN_STYLE\s*=\s*[^;]+;', 'CODE_SIGN_STYLE = Manual;', text)
+          inject = (
+              'buildSettings = {\n'
+              '\t\t\t\tCODE_SIGNING_ALLOWED = NO;\n'
+              '\t\t\t\tCODE_SIGNING_REQUIRED = NO;\n'
+              '\t\t\t\tCODE_SIGN_IDENTITY = "";\n'
+              '\t\t\t\tDEVELOPMENT_TEAM = "";'
+          )
+          text = text.replace('buildSettings = {', inject)
+          with open(path, "w", encoding="utf-8") as f:
+              f.write(text)
+          PYEOF
 
-          APP_PATH=$(find build/ios-derived/Build/Products/Release-iphoneos -maxdepth 2 -name "*.app" | head -n 1)
+          # Run Tauri iOS build (archive succeeds unsigned; exportArchive may fail without Apple cert)
+          npx tauri ios build --ci || true
+
+          APP_PATH=$(find src-tauri/gen/apple/build -name "*.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: No compiled .app bundle found under src-tauri/gen/apple/build"
+            find src-tauri/gen/apple -maxdepth 5 || true
+            exit 1
+          fi
+          echo "Found compiled unsigned .app: $APP_PATH"
           mkdir -p build/ipa/Payload
           cp -R "$APP_PATH" build/ipa/Payload/
           (cd build/ipa && zip -qry ../CipherGen-iOS-unsigned.ipa Payload)
