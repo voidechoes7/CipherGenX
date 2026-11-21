@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Header } from "./components/Header";
 import { ModeTabs } from "./components/ModeTabs";
+import { QuickPresets, type SecurityPresetId } from "./components/QuickPresets";
 import { PasswordConfigPanel } from "./components/PasswordConfigPanel";
 import { PassphraseConfigPanel } from "./components/PassphraseConfigPanel";
 import { KeysConfigPanel } from "./components/KeysConfigPanel";
@@ -179,11 +180,14 @@ export default function App() {
     };
   }, [customSecret]);
 
-  const handleCopyItem = async (value: string, index: number) => {
-    if (!clipboardRef.current) return;
-    await clipboardRef.current.copyWithAutoClear(value, clipboardTtl);
-    setCopiedIndex(index);
-  };
+  const handleCopyItem = useCallback(
+    async (value: string, index: number) => {
+      if (!clipboardRef.current) return;
+      await clipboardRef.current.copyWithAutoClear(value, clipboardTtl);
+      setCopiedIndex(index);
+    },
+    [clipboardTtl]
+  );
 
   const handleCopyAll = async () => {
     if (!clipboardRef.current || items.length === 0) return;
@@ -192,11 +196,95 @@ export default function App() {
     setCopiedIndex("all");
   };
 
-  const handleClearClipboard = async () => {
+  const handleClearClipboard = useCallback(async () => {
     if (!clipboardRef.current) return;
     await clipboardRef.current.clearNow();
     setCopiedIndex(null);
+  }, []);
+
+  const handlePanicWipe = useCallback(async () => {
+    setItems([]);
+    setCustomSecret("");
+    setCustomAnalysis(null);
+    await handleClearClipboard();
+  }, [handleClearClipboard]);
+
+  const handlePreset = (preset: SecurityPresetId) => {
+    if (preset === "daily") {
+      setActiveTab("password");
+      setPasswordConfig({
+        length: 20,
+        uppercase: true,
+        lowercase: true,
+        numbers: true,
+        safeSymbols: true,
+        extendedSymbols: false,
+        excludeAmbiguous: true,
+        count: batchCount,
+      });
+    } else if (preset === "masterVault") {
+      setActiveTab("passphrase");
+      setPassphraseConfig({
+        wordCount: 7,
+        separator: "-",
+        capitalization: "title",
+        includeNumber: true,
+        count: batchCount,
+      });
+    } else if (preset === "postQuantum") {
+      setActiveTab("password");
+      setPasswordConfig({
+        length: 44,
+        uppercase: true,
+        lowercase: true,
+        numbers: true,
+        safeSymbols: true,
+        extendedSymbols: true,
+        excludeAmbiguous: false,
+        count: batchCount,
+      });
+    } else if (preset === "apiBase32") {
+      setActiveTab("keys");
+      setKeySubMode("base32");
+      setKeyConfig({
+        format: "base32",
+        bits: "256",
+        uppercase: true,
+        grouped: true,
+        count: batchCount,
+      });
+    }
   };
+
+  // Keyboard shortcuts: Ctrl/Cmd+G regenerate, Ctrl/Cmd+Shift+C copy first, Esc panic wipe
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isEditable =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.tagName === "SELECT";
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "g") {
+        e.preventDefault();
+        void runGeneration();
+      } else if (
+        (e.ctrlKey || e.metaKey) &&
+        e.shiftKey &&
+        e.key.toLowerCase() === "c" &&
+        items.length > 0
+      ) {
+        e.preventDefault();
+        void handleCopyItem(items[0].value, 0);
+      } else if (e.key === "Escape" && !isEditable) {
+        e.preventDefault();
+        void handlePanicWipe();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleCopyItem, handlePanicWipe, items, runGeneration]);
 
   return (
     <div className="cyber-bg safe-area-pad min-h-screen w-full">
@@ -205,9 +293,13 @@ export default function App() {
           theme={theme}
           onThemeChange={setTheme}
           isNativeRust={isNativeRust}
+          onPanicWipe={handlePanicWipe}
         />
 
-        <ModeTabs activeTab={activeTab} onChange={setActiveTab} />
+        <div className="space-y-3">
+          <ModeTabs activeTab={activeTab} onChange={setActiveTab} />
+          <QuickPresets onSelect={handlePreset} />
+        </div>
 
         {error && (
           <div className="rounded-xl border border-rose-500/40 bg-rose-950/30 px-4 py-3 text-xs text-rose-200">

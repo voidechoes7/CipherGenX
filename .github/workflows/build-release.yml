@@ -7,6 +7,22 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      platform:
+        description: "Target platform to build"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - windows
+          - linux
+          - android
+          - ios
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -49,6 +65,7 @@ jobs:
   build-windows:
     name: Build Windows (.exe NSIS)
     needs: test
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'windows'
     runs-on: windows-latest
     steps:
       - name: Checkout repository
@@ -82,6 +99,7 @@ jobs:
   build-linux:
     name: Build Linux (.deb & .AppImage)
     needs: test
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'linux'
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
@@ -129,6 +147,7 @@ jobs:
   build-android:
     name: Build Android (.apk)
     needs: test
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'android'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -171,7 +190,7 @@ jobs:
         run: npx tauri android init --ci
 
       - name: Build Android APK
-        run: npx tauri android build --apk true
+        run: npx tauri android build --apk
 
       - name: Upload Android .apk artifact
         uses: actions/upload-artifact@v4
@@ -183,6 +202,7 @@ jobs:
   build-ios-unsigned:
     name: Build iOS (unsigned .ipa)
     needs: test
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'ios'
     runs-on: macos-latest
     steps:
       - name: Checkout repository
@@ -213,7 +233,6 @@ jobs:
 
       - name: Build unsigned iOS .app & package .ipa
         run: |
-          npx tauri ios build --target aarch64 --ci -- -- --no-sign || true
           XCODE_PROJ=$(find src-tauri/gen/apple -maxdepth 2 -name "*.xcodeproj" | head -n 1)
           SCHEME=$(xcodebuild -list -project "$XCODE_PROJ" | awk '/Schemes:/{getline; gsub(/^[ \t]+/, ""); print; exit}')
           xcodebuild \

@@ -165,47 +165,71 @@ export function OutputList({
       </div>
 
       {/* Generated items list */}
-      <div className="space-y-2">
-        {items.map((item, idx) => {
-          const isCopied = copiedIndex === idx;
-          return (
-            <div
-              key={`${idx}-${item.value.slice(0, 8)}`}
-              className="cyber-elevated group flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 transition hover:border-slate-600/80"
-            >
-              <div className="min-w-0 flex-1">
-                {items.length > 1 && (
-                  <span className="mr-2 font-mono text-[11px] text-slate-500">
-                    #{idx + 1}
-                  </span>
-                )}
-                <code className="font-mono-secret break-all text-sm font-medium leading-relaxed sm:text-base">
-                  {renderHighlightedSecret(item.value, masked)}
-                </code>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onCopyItem(item.value, idx)}
-                aria-label={`Copiar elemento ${idx + 1}`}
-                className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white active:scale-95"
+      {items.length === 0 ? (
+        <div className="cyber-elevated flex flex-col items-center justify-center gap-2.5 rounded-xl px-4 py-8 text-center">
+          <p className="text-xs text-slate-400">
+            Memoria visual y portapapeles limpiados. Cero rastros en pantalla.
+          </p>
+          <button
+            type="button"
+            onClick={onRegenerate}
+            className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold text-slate-950 transition hover:brightness-110"
+            style={{ backgroundColor: "var(--accent)" }}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>Generar nuevo secreto</span>
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {items.map((item, idx) => {
+            const isCopied = copiedIndex === idx;
+            return (
+              <div
+                key={`${idx}-${item.value.slice(0, 8)}`}
+                className="cyber-elevated group flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 transition hover:border-slate-600/80"
               >
-                {isCopied ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-400" />
-                    <span className="text-emerald-300">Copiado</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>Copiar</span>
-                  </>
-                )}
-              </button>
-            </div>
-          );
-        })}
-      </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {items.length > 1 && (
+                      <span className="font-mono text-[11px] text-slate-500">
+                        #{idx + 1}
+                      </span>
+                    )}
+                    <code className="font-mono-secret break-all text-sm font-medium leading-relaxed sm:text-base">
+                      {renderHighlightedSecret(item.value, masked)}
+                    </code>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
+                    <span>{[...item.value].length} caracteres</span>
+                    <span>•</span>
+                    <span>{item.entropyBits.toFixed(1)} bits</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => onCopyItem(item.value, idx)}
+                  aria-label={`Copiar elemento ${idx + 1}`}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white active:scale-95"
+                >
+                  {isCopied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      <span className="text-emerald-300">Copiado</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" />
+                      <span>Copiar</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Clipboard auto-clear countdown banner */}
       {timerState.active && (
