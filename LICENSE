@@ -1,0 +1,20 @@
+CipherGenX ("CipherGen") — Proprietary License
+Copyright (c) 2026 CipherGenX / voidechoes7.
+
+All Rights Reserved — Private Personal Use.
+
+Notice:
+This software and its associated source code, cryptographic modules, documentation,
+visual assets, and compiled binaries are proprietary and strictly reserved for
+private personal use by the copyright holder.
+
+Unauthorized copying, redistribution, sublicensing, public hosting, commercial
+exploitation, or creation of derivative works from this software, in whole or in
+part, via any medium, is strictly prohibited without prior written permission
+from the copyright holder.
+
+Third-Party Notices:
+- The embedded EFF Large Wordlist (eff_large_wordlist.txt) is distributed by the
+  Electronic Frontier Foundation under CC-BY-3.0 (https://www.eff.org/dice).
+- Open-source dependencies (Rust crates and npm packages) remain subject to their
+  respective licenses.

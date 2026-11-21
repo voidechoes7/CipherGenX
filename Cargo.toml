@@ -1,0 +1,19 @@
+[workspace]
+members = [
+    "crates/ciphergen-core",
+    "src-tauri",
+]
+resolver = "2"
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+authors = ["voidechoes7"]
+license = "LicenseRef-Proprietary"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

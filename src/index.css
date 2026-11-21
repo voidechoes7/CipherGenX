@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+:root,
+[data-theme="obsidian"] {
+  --bg-base: #07090e;
+  --bg-panel: #0d111a;
+  --bg-elevated: #131926;
+  --border-subtle: rgba(148, 163, 184, 0.14);
+  --border-accent: rgba(0, 240, 255, 0.35);
+  --accent: #00f0ff;
+  --accent-secondary: #10b981;
+  --accent-glow: rgba(0, 240, 255, 0.16);
+  --text-primary: #f1f5f9;
+  --text-muted: #94a3b8;
+}
+
+[data-theme="violet"] {
+  --bg-base: #090611;
+  --bg-panel: #120d1f;
+  --bg-elevated: #1b132e;
+  --border-subtle: rgba(168, 85, 247, 0.18);
+  --border-accent: rgba(168, 85, 247, 0.45);
+  --accent: #c084fc;
+  --accent-secondary: #ec4899;
+  --accent-glow: rgba(168, 85, 247, 0.18);
+  --text-primary: #f5f3ff;
+  --text-muted: #a78bfa;
+}
+
+[data-theme="matrix"] {
+  --bg-base: #040805;
+  --bg-panel: #09120b;
+  --bg-elevated: #0f1d12;
+  --border-subtle: rgba(34, 197, 94, 0.18);
+  --border-accent: rgba(34, 197, 94, 0.45);
+  --accent: #22c55e;
+  --accent-secondary: #84cc16;
+  --accent-glow: rgba(34, 197, 94, 0.16);
+  --text-primary: #ecfdf5;
+  --text-muted: #86efac;
+}
+
+[data-theme="amber"] {
+  --bg-base: #0b0907;
+  --bg-panel: #15110d;
+  --bg-elevated: #201912;
+  --border-subtle: rgba(245, 158, 11, 0.18);
+  --border-accent: rgba(245, 158, 11, 0.45);
+  --accent: #f59e0b;
+  --accent-secondary: #fb923c;
+  --accent-glow: rgba(245, 158, 11, 0.16);
+  --text-primary: #fffbeb;
+  --text-muted: #fcd34d;
+}
+
+html,
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+.cyber-bg {
+  background:
+    radial-gradient(circle at 12% 0%, var(--accent-glow), transparent 42%),
+    radial-gradient(circle at 88% 10%, rgba(16, 185, 129, 0.08), transparent 36%),
+    var(--bg-base);
+}
+
+.cyber-panel {
+  background-color: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+.cyber-elevated {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+}
+
+.cyber-accent-ring {
+  border-color: var(--border-accent);
+  box-shadow: 0 0 24px var(--accent-glow);
+}
+
+.font-mono-secret {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-variant-ligatures: none;
+}
+
+input[type="range"].cyber-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: rgba(148, 163, 184, 0.2);
+  outline: none;
+}
+
+input[type="range"].cyber-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--bg-base);
+  box-shadow: 0 0 12px var(--accent-glow);
+  cursor: pointer;
+}
+
+input[type="range"].cyber-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  background: var(--accent);
+  border: 2px solid var(--bg-base);
+  box-shadow: 0 0 12px var(--accent-glow);
+  cursor: pointer;
+}
+
+/* Safe area insets for iOS / Android notched screens */
+.safe-area-pad {
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
