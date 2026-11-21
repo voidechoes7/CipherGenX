@@ -15,6 +15,7 @@ interface SecurityAnalysisPanelProps {
   customSecret: string;
   onCustomSecretChange: (val: string) => void;
   customAnalysis: SecurityAnalysis | null;
+  hideInlineInspector?: boolean;
 }
 
 const LEVEL_STYLES: Record<
@@ -53,9 +54,13 @@ export function SecurityAnalysisPanel({
   customSecret,
   onCustomSecretChange,
   customAnalysis,
+  hideInlineInspector = false,
 }: SecurityAnalysisPanelProps) {
   const [inspectOpen, setInspectOpen] = useState(false);
-  const active = inspectOpen && customAnalysis ? customAnalysis : analysis;
+  const active =
+    !hideInlineInspector && inspectOpen && customAnalysis
+      ? customAnalysis
+      : analysis;
   const styles = LEVEL_STYLES[active.level];
 
   return (
@@ -69,17 +74,19 @@ export function SecurityAnalysisPanel({
           </h2>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setInspectOpen((v) => !v)}
-          className="cyber-elevated inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium text-slate-300 transition hover:text-white"
-        >
-          <Search className="h-3 w-3" />
-          <span>{inspectOpen ? "Ver generador" : "Analizar clave propia"}</span>
-        </button>
+        {!hideInlineInspector && (
+          <button
+            type="button"
+            onClick={() => setInspectOpen((v) => !v)}
+            className="cyber-elevated inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium text-slate-300 transition hover:text-white"
+          >
+            <Search className="h-3 w-3" />
+            <span>{inspectOpen ? "Ver generador" : "Analizar clave propia"}</span>
+          </button>
+        )}
       </div>
 
-      {inspectOpen && (
+      {!hideInlineInspector && inspectOpen && (
         <div className="space-y-1.5">
           <input
             type="text"

@@ -1,4 +1,4 @@
-import { KeyRound, BookOpenText, Binary } from "lucide-react";
+import { KeyRound, BookOpenText, Binary, ShieldCheck } from "lucide-react";
 import type { ActiveTab } from "../types/ciphergen";
 
 interface ModeTabsProps {
@@ -16,7 +16,7 @@ const TABS: { id: ActiveTab; label: string; sub: string; icon: typeof KeyRound }
   {
     id: "passphrase",
     label: "Diceware EFF",
-    sub: "7,776 palabras offline",
+    sub: "7,776 palabras",
     icon: BookOpenText,
   },
   {
@@ -25,12 +25,18 @@ const TABS: { id: ActiveTab; label: string; sub: string; icon: typeof KeyRound }
     sub: "PIN • Hex • Base32",
     icon: Binary,
   },
+  {
+    id: "analyzer",
+    label: "Analizador",
+    sub: "Evaluar clave manual",
+    icon: ShieldCheck,
+  },
 ];
 
 export function ModeTabs({ activeTab, onChange }: ModeTabsProps) {
   return (
     <div
-      className="cyber-panel grid grid-cols-3 gap-1.5 rounded-2xl p-1.5"
+      className="cyber-panel grid grid-cols-2 gap-1.5 rounded-2xl p-1.5 sm:grid-cols-4"
       role="tablist"
     >
       {TABS.map((tab) => {
@@ -43,7 +49,7 @@ export function ModeTabs({ activeTab, onChange }: ModeTabsProps) {
             role="tab"
             aria-selected={isActive}
             onClick={() => onChange(tab.id)}
-            className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2.5 text-center transition-all sm:flex-row sm:gap-2.5 sm:px-4 ${
+            className={`flex flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-2.5 text-center transition-all sm:flex-row sm:gap-2 sm:px-3 ${
               isActive
                 ? "text-white"
                 : "text-slate-400 hover:bg-white/[0.03] hover:text-slate-200"
@@ -65,7 +71,7 @@ export function ModeTabs({ activeTab, onChange }: ModeTabsProps) {
               <div className="truncate text-xs font-semibold sm:text-sm">
                 {tab.label}
               </div>
-              <div className="hidden truncate text-[11px] text-slate-400 sm:block">
+              <div className="hidden truncate text-[10px] text-slate-400 md:block">
                 {tab.sub}
               </div>
             </div>

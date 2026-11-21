@@ -317,5 +317,37 @@ pub fn analyze_custom_secret(secret: &str) -> SecurityAnalysis {
         0.0
     };
 
-    analyze_entropy(entropy_bits, GenerationMode::Password, alphabet)
+    let mut result = analyze_entropy(entropy_bits, GenerationMode::Password, alphabet);
+
+    // Local heuristic warnings for manually typed passwords (100% offline).
+    let lower = secret.to_lowercase();
+    let chars: Vec<char> = secret.chars().collect();
+
+    if len < 12 {
+        result.recommendations.insert(
+            0,
+            "Longitud corta (< 12 caracteres): añade más caracteres o usa una frase Diceware de 6+ palabras."
+                .to_string(),
+        );
+    }
+
+    let has_triple_repeat = chars.windows(3).any(|w| w[0] == w[1] && w[1] == w[2]);
+    if has_triple_repeat {
+        result.recommendations.insert(
+            0,
+            "Patrón detectado: contiene 3 o más caracteres idénticos seguidos, lo cual reduce la imprevisibilidad real."
+                .to_string(),
+        );
+    }
+
+    let common_seqs = ["1234", "2345", "3456", "4567", "5678", "6789", "abcd", "qwer", "asdf", "zxcv", "password", "admin"];
+    if common_seqs.iter().any(|seq| lower.contains(seq)) {
+        result.recommendations.insert(
+            0,
+            "Patrón predecible detectado (secuencia común o palabra de diccionario): la entropía práctica es menor que la teórica."
+                .to_string(),
+        );
+    }
+
+    result
 }

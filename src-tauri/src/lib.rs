@@ -37,8 +37,12 @@ fn analyze_secret_cmd(secret: String) -> SecurityAnalysis {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_clipboard_manager::init())
+    let builder = tauri::Builder::default().plugin(tauri_plugin_clipboard_manager::init());
+
+    #[cfg(mobile)]
+    let builder = builder.plugin(tauri_plugin_biometric::init());
+
+    builder
         .invoke_handler(tauri::generate_handler![
             generate_passwords_cmd,
             generate_passphrases_cmd,

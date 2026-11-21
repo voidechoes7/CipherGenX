@@ -189,6 +189,17 @@ jobs:
       - name: Initialize Tauri Android project
         run: npx tauri android init --ci
 
+      - name: Apply Neon Cyber Shield launcher icons & Obsidian background for Android
+        run: |
+          npx tauri icon src-tauri/icons/app-icon.png
+          cp -R src-tauri/icons/android/* src-tauri/gen/android/app/src/main/res/
+          cat <<'XMLEOF' > src-tauri/gen/android/app/src/main/res/values/ic_launcher_background.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+            <color name="ic_launcher_background">#090B10</color>
+          </resources>
+          XMLEOF
+
       - name: Build Android APK
         run: npx tauri android build --apk
 
@@ -210,16 +221,16 @@ jobs:
             --ks-key-alias ciphergen \
             --ks-pass pass:ciphergen2026 \
             --key-pass pass:ciphergen2026 \
-            --out build/android/CipherGen_1.0.0_Android_universal-signed.apk \
+            --out build/android/CipherGen_1.0.1_Android_universal-signed.apk \
             build/android/CipherGen-aligned.apk
-          "$BUILD_TOOLS/apksigner" verify build/android/CipherGen_1.0.0_Android_universal-signed.apk
-          ls -lh build/android/CipherGen_1.0.0_Android_universal-signed.apk
+          "$BUILD_TOOLS/apksigner" verify build/android/CipherGen_1.0.1_Android_universal-signed.apk
+          ls -lh build/android/CipherGen_1.0.1_Android_universal-signed.apk
 
       - name: Upload Android .apk artifact
         uses: actions/upload-artifact@v4
         with:
           name: CipherGen-Android-APK
-          path: build/android/CipherGen_1.0.0_Android_universal-signed.apk
+          path: build/android/CipherGen_1.0.1_Android_universal-signed.apk
           if-no-files-found: error
 
   build-ios-unsigned:
@@ -253,6 +264,15 @@ jobs:
 
       - name: Initialize Tauri iOS project
         run: npx tauri ios init --ci
+
+      - name: Apply Neon Cyber Shield iOS AppIcons & Face ID permission
+        run: |
+          npx tauri icon src-tauri/icons/app-icon.png
+          INFO_PLIST=$(find src-tauri/gen/apple -name "Info.plist" | head -n 1)
+          if [ -n "$INFO_PLIST" ]; then
+            /usr/libexec/PlistBuddy -c "Add :NSFaceIDUsageDescription string 'CipherGenX usa Face ID para proteger el acceso a tu generador criptográfico offline.'" "$INFO_PLIST" || \
+            /usr/libexec/PlistBuddy -c "Set :NSFaceIDUsageDescription 'CipherGenX usa Face ID para proteger el acceso a tu generador criptográfico offline.'" "$INFO_PLIST"
+          fi
 
       - name: Disable code signing in generated Xcode project & build unsigned .ipa
         run: |
@@ -289,14 +309,14 @@ jobs:
           echo "Found compiled unsigned .app: $APP_PATH"
           mkdir -p build/ipa/Payload
           cp -R "$APP_PATH" build/ipa/Payload/
-          (cd build/ipa && zip -qry ../CipherGen_1.0.0_iOS-unsigned.ipa Payload)
-          ls -lh build/CipherGen_1.0.0_iOS-unsigned.ipa
+          (cd build/ipa && zip -qry ../CipherGen_1.0.1_iOS-unsigned.ipa Payload)
+          ls -lh build/CipherGen_1.0.1_iOS-unsigned.ipa
 
       - name: Upload unsigned iOS .ipa artifact
         uses: actions/upload-artifact@v4
         with:
           name: CipherGen-iOS-Unsigned-IPA
-          path: build/CipherGen_1.0.0_iOS-unsigned.ipa
+          path: build/CipherGen_1.0.1_iOS-unsigned.ipa
           if-no-files-found: error
 
   publish-release:

@@ -95,7 +95,13 @@ export interface KeyBatchResult {
   analysis: SecurityAnalysis;
 }
 
-export type ActiveTab = "password" | "passphrase" | "keys";
+export type ActiveTab = "password" | "passphrase" | "keys" | "analyzer";
 export type KeySubMode = "pin" | "hex" | "base32";
 export type ClipboardTtl = 15 | 30 | 60;
-export type ThemeId = "obsidian" | "violet" | "matrix" | "amber";
+export type ThemeId =
+  | "obsidian"
+  | "violet"
+  | "matrix"
+  | "amber"
+  | "ios-light"
+  | "cyber-light";

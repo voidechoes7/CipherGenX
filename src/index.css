@@ -53,6 +53,32 @@
   --text-muted: #fcd34d;
 }
 
+[data-theme="ios-light"] {
+  --bg-base: #f2f5fa;
+  --bg-panel: rgba(255, 255, 255, 0.92);
+  --bg-elevated: #eef2f8;
+  --border-subtle: rgba(15, 23, 42, 0.1);
+  --border-accent: rgba(0, 122, 255, 0.38);
+  --accent: #007aff;
+  --accent-secondary: #0284c7;
+  --accent-glow: rgba(0, 122, 255, 0.12);
+  --text-primary: #0f172a;
+  --text-muted: #475569;
+}
+
+[data-theme="cyber-light"] {
+  --bg-base: #eef4f5;
+  --bg-panel: rgba(255, 255, 255, 0.94);
+  --bg-elevated: #e6eff2;
+  --border-subtle: rgba(15, 23, 42, 0.11);
+  --border-accent: rgba(13, 148, 136, 0.42);
+  --accent: #0d9488;
+  --accent-secondary: #4f46e5;
+  --accent-glow: rgba(13, 148, 136, 0.14);
+  --text-primary: #0f172a;
+  --text-muted: #475569;
+}
+
 html,
 body {
   background-color: var(--bg-base);
@@ -87,6 +113,101 @@ body {
   box-shadow: 0 0 24px var(--accent-glow);
 }
 
+/* Light-theme high-contrast refinements (iOS Frost Light & Cyber Daylight) */
+[data-theme="ios-light"] .cyber-panel,
+[data-theme="cyber-light"] .cyber-panel {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  backdrop-filter: blur(16px);
+}
+
+[data-theme="ios-light"] .text-white,
+[data-theme="cyber-light"] .text-white,
+[data-theme="ios-light"] .text-slate-100,
+[data-theme="cyber-light"] .text-slate-100,
+[data-theme="ios-light"] .text-slate-200,
+[data-theme="cyber-light"] .text-slate-200 {
+  color: #0f172a;
+}
+
+[data-theme="ios-light"] .text-slate-300,
+[data-theme="cyber-light"] .text-slate-300 {
+  color: #334155;
+}
+
+[data-theme="ios-light"] .text-slate-400,
+[data-theme="cyber-light"] .text-slate-400 {
+  color: #475569;
+}
+
+[data-theme="ios-light"] .text-slate-500,
+[data-theme="cyber-light"] .text-slate-500 {
+  color: #64748b;
+}
+
+[data-theme="ios-light"] .text-cyan-300,
+[data-theme="cyber-light"] .text-cyan-300,
+[data-theme="ios-light"] .text-cyan-200,
+[data-theme="cyber-light"] .text-cyan-200 {
+  color: #0284c7;
+}
+
+[data-theme="ios-light"] .text-amber-300,
+[data-theme="cyber-light"] .text-amber-300 {
+  color: #b45309;
+}
+
+[data-theme="ios-light"] .text-emerald-300,
+[data-theme="cyber-light"] .text-emerald-300 {
+  color: #047857;
+}
+
+[data-theme="ios-light"] .text-rose-300,
+[data-theme="cyber-light"] .text-rose-300 {
+  color: #be123c;
+}
+
+[data-theme="ios-light"] .text-sky-300,
+[data-theme="cyber-light"] .text-sky-300 {
+  color: #0369a1;
+}
+
+[data-theme="ios-light"] .bg-slate-900,
+[data-theme="cyber-light"] .bg-slate-900,
+[data-theme="ios-light"] .bg-slate-900\/70,
+[data-theme="cyber-light"] .bg-slate-900\/70,
+[data-theme="ios-light"] .bg-slate-900\/40,
+[data-theme="cyber-light"] .bg-slate-900\/40 {
+  background-color: #e2e8f0;
+}
+
+[data-theme="ios-light"] .bg-slate-800,
+[data-theme="cyber-light"] .bg-slate-800 {
+  background-color: #cbd5e1;
+}
+
+[data-theme="ios-light"] .border-slate-800,
+[data-theme="cyber-light"] .border-slate-800,
+[data-theme="ios-light"] .border-slate-800\/80,
+[data-theme="cyber-light"] .border-slate-800\/80,
+[data-theme="ios-light"] .border-slate-700\/80,
+[data-theme="cyber-light"] .border-slate-700\/80 {
+  border-color: rgba(15, 23, 42, 0.14);
+}
+
+[data-theme="ios-light"] .bg-white\/15,
+[data-theme="cyber-light"] .bg-white\/15 {
+  background-color: rgba(0, 122, 255, 0.14);
+}
+
+[data-theme="ios-light"] .btn-accent-text,
+[data-theme="cyber-light"] .btn-accent-text {
+  color: #ffffff;
+}
+
+.btn-accent-text {
+  color: #020617;
+}
+
 .font-mono-secret {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     "Courier New", monospace;
@@ -98,7 +219,7 @@ input[type="range"].cyber-slider {
   appearance: none;
   height: 6px;
   border-radius: 9999px;
-  background: rgba(148, 163, 184, 0.2);
+  background: rgba(148, 163, 184, 0.28);
   outline: none;
 }
 
@@ -122,6 +243,21 @@ input[type="range"].cyber-slider::-moz-range-thumb {
   border: 2px solid var(--bg-base);
   box-shadow: 0 0 12px var(--accent-glow);
   cursor: pointer;
+}
+
+@keyframes pulse-shield {
+  0%, 100% {
+    box-shadow: 0 0 28px var(--accent-glow), 0 0 60px rgba(0, 240, 255, 0.12);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 42px var(--accent-glow), 0 0 85px rgba(236, 72, 153, 0.18);
+    transform: scale(1.025);
+  }
+}
+
+.shield-halo {
+  animation: pulse-shield 3.2s ease-in-out infinite;
 }
 
 /* Safe area insets for iOS / Android notched screens */

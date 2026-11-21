@@ -7,6 +7,8 @@ import { PassphraseConfigPanel } from "./components/PassphraseConfigPanel";
 import { KeysConfigPanel } from "./components/KeysConfigPanel";
 import { OutputList } from "./components/OutputList";
 import { SecurityAnalysisPanel } from "./components/SecurityAnalysisPanel";
+import { ManualAnalyzerPanel } from "./components/ManualAnalyzerPanel";
+import { SplashScreen } from "./components/SplashScreen";
 import { PrivacyFooter } from "./components/PrivacyFooter";
 import {
   AutoClearClipboardController,
@@ -14,6 +16,13 @@ import {
   isTauriRuntime,
   type ClipboardTimerState,
 } from "./lib/clipboard";
+import {
+  authenticateWithBiometrics,
+  checkBiometricAvailability,
+  getBiometricLockEnabled,
+  setBiometricLockEnabled,
+} from "./lib/biometric";
+import { isLightTheme } from "./lib/themes";
 import {
   analyzeCustomSecret,
   generateKeys,
@@ -33,6 +42,8 @@ import type {
   SecurityAnalysis,
   ThemeId,
 } from "./types/ciphergen";
+
+const THEME_PREF_KEY = "ciphergen_theme_v1";
 
 const DEFAULT_PASSWORD_CONFIG: PasswordConfig = {
   length: 24,
@@ -66,8 +77,34 @@ const DEFAULT_KEY_CONFIG: KeyConfig = {
   count: 1,
 };
 
+function loadSavedTheme(): ThemeId {
+  try {
+    const saved = localStorage.getItem(THEME_PREF_KEY) as ThemeId | null;
+    if (
+      saved === "obsidian" ||
+      saved === "violet" ||
+      saved === "matrix" ||
+      saved === "amber" ||
+      saved === "ios-light" ||
+      saved === "cyber-light"
+    ) {
+      return saved;
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return "obsidian";
+}
+
 export default function App() {
-  const [theme, setTheme] = useState<ThemeId>("obsidian");
+  const [theme, setTheme] = useState<ThemeId>(loadSavedTheme);
+  const [unlocked, setUnlocked] = useState<boolean>(false);
+  const [biometricAvailable, setBiometricAvailable] = useState<boolean>(false);
+  const [biometricLabel, setBiometricLabel] = useState<string>("Biometría");
+  const [biometricLockEnabled, setBiometricLockState] = useState<boolean>(
+    getBiometricLockEnabled
+  );
+
   const [activeTab, setActiveTab] = useState<ActiveTab>("password");
   const [keySubMode, setKeySubMode] = useState<KeySubMode>("hex");
   const [batchCount, setBatchCount] = useState<number>(1);
@@ -104,7 +141,25 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.classList.toggle("dark", !isLightTheme(theme));
+    try {
+      localStorage.setItem(THEME_PREF_KEY, theme);
+    } catch {
+      // Ignore storage errors
+    }
   }, [theme]);
+
+  useEffect(() => {
+    let active = true;
+    void checkBiometricAvailability().then((status) => {
+      if (!active) return;
+      setBiometricAvailable(status.available);
+      setBiometricLabel(status.label);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const controller = new AutoClearClipboardController(
@@ -115,7 +170,13 @@ export default function App() {
     return () => controller.dispose();
   }, []);
 
+  const handleToggleBiometricLock = useCallback((enabled: boolean) => {
+    setBiometricLockState(enabled);
+    setBiometricLockEnabled(enabled);
+  }, []);
+
   const runGeneration = useCallback(async () => {
+    if (activeTab === "analyzer") return;
     try {
       setError(null);
       if (activeTab === "password") {
@@ -209,6 +270,11 @@ export default function App() {
     await handleClearClipboard();
   }, [handleClearClipboard]);
 
+  const handleLockNow = useCallback(async () => {
+    await handlePanicWipe();
+    setUnlocked(false);
+  }, [handlePanicWipe]);
+
   const handlePreset = (preset: SecurityPresetId) => {
     if (preset === "daily") {
       setActiveTab("password");
@@ -256,8 +322,8 @@ export default function App() {
     }
   };
 
-  // Keyboard shortcuts: Ctrl/Cmd+G regenerate, Ctrl/Cmd+Shift+C copy first, Esc panic wipe
   useEffect(() => {
+    if (!unlocked) return;
     const onKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const isEditable =
@@ -284,7 +350,22 @@ export default function App() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleCopyItem, handlePanicWipe, items, runGeneration]);
+  }, [handleCopyItem, handlePanicWipe, items, runGeneration, unlocked]);
+
+  if (!unlocked) {
+    return (
+      <SplashScreen
+        biometricAvailable={biometricAvailable}
+        biometricLabel={biometricLabel}
+        biometricLockEnabled={biometricLockEnabled}
+        onUnlockBiometric={() =>
+          authenticateWithBiometrics("Desbloquear CipherGenX")
+        }
+        onEnter={() => setUnlocked(true)}
+        onToggleBiometricLock={handleToggleBiometricLock}
+      />
+    );
+  }
 
   return (
     <div className="cyber-bg safe-area-pad min-h-screen w-full">
@@ -294,11 +375,16 @@ export default function App() {
           onThemeChange={setTheme}
           isNativeRust={isNativeRust}
           onPanicWipe={handlePanicWipe}
+          biometricAvailable={biometricAvailable}
+          biometricLabel={biometricLabel}
+          biometricLockEnabled={biometricLockEnabled}
+          onToggleBiometricLock={handleToggleBiometricLock}
+          onLockNow={handleLockNow}
         />
 
         <div className="space-y-3">
           <ModeTabs activeTab={activeTab} onChange={setActiveTab} />
-          <QuickPresets onSelect={handlePreset} />
+          {activeTab !== "analyzer" && <QuickPresets onSelect={handlePreset} />}
         </div>
 
         {error && (
@@ -307,69 +393,79 @@ export default function App() {
           </div>
         )}
 
-        <OutputList
-          items={items}
-          batchCount={batchCount}
-          onBatchCountChange={setBatchCount}
-          masked={masked}
-          onToggleMask={() => setMasked((m) => !m)}
-          clipboardTtl={clipboardTtl}
-          onClipboardTtlChange={setClipboardTtl}
-          timerState={timerState}
-          copiedIndex={copiedIndex}
-          onCopyItem={handleCopyItem}
-          onCopyAll={handleCopyAll}
-          onClearClipboard={handleClearClipboard}
-          onRegenerate={runGeneration}
-        />
+        {activeTab === "analyzer" ? (
+          <ManualAnalyzerPanel
+            secret={customSecret}
+            onSecretChange={setCustomSecret}
+            analysis={customAnalysis}
+          />
+        ) : (
+          <>
+            <OutputList
+              items={items}
+              batchCount={batchCount}
+              onBatchCountChange={setBatchCount}
+              masked={masked}
+              onToggleMask={() => setMasked((m) => !m)}
+              clipboardTtl={clipboardTtl}
+              onClipboardTtlChange={setClipboardTtl}
+              timerState={timerState}
+              copiedIndex={copiedIndex}
+              onCopyItem={handleCopyItem}
+              onCopyAll={handleCopyAll}
+              onClearClipboard={handleClearClipboard}
+              onRegenerate={runGeneration}
+            />
 
-        <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
-          <section className="cyber-panel rounded-2xl p-4 sm:p-5 lg:col-span-6">
-            <h2 className="mb-4 text-sm font-bold tracking-tight text-slate-200">
-              {activeTab === "password"
-                ? "Parámetros de Contraseña"
-                : activeTab === "passphrase"
-                ? "Parámetros de Frase Diceware"
-                : "Parámetros de PIN y Llaves"}
-            </h2>
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
+              <section className="cyber-panel rounded-2xl p-4 sm:p-5 lg:col-span-6">
+                <h2 className="mb-4 text-sm font-bold tracking-tight text-slate-200">
+                  {activeTab === "password"
+                    ? "Parámetros de Contraseña"
+                    : activeTab === "passphrase"
+                    ? "Parámetros de Frase Diceware"
+                    : "Parámetros de PIN y Llaves"}
+                </h2>
 
-            {activeTab === "password" && (
-              <PasswordConfigPanel
-                config={passwordConfig}
-                onChange={setPasswordConfig}
-              />
-            )}
+                {activeTab === "password" && (
+                  <PasswordConfigPanel
+                    config={passwordConfig}
+                    onChange={setPasswordConfig}
+                  />
+                )}
 
-            {activeTab === "passphrase" && (
-              <PassphraseConfigPanel
-                config={passphraseConfig}
-                onChange={setPassphraseConfig}
-              />
-            )}
+                {activeTab === "passphrase" && (
+                  <PassphraseConfigPanel
+                    config={passphraseConfig}
+                    onChange={setPassphraseConfig}
+                  />
+                )}
 
-            {activeTab === "keys" && (
-              <KeysConfigPanel
-                subMode={keySubMode}
-                onSubModeChange={setKeySubMode}
-                pinConfig={pinConfig}
-                onPinChange={setPinConfig}
-                keyConfig={keyConfig}
-                onKeyChange={setKeyConfig}
-              />
-            )}
-          </section>
+                {activeTab === "keys" && (
+                  <KeysConfigPanel
+                    subMode={keySubMode}
+                    onSubModeChange={setKeySubMode}
+                    pinConfig={pinConfig}
+                    onPinChange={setPinConfig}
+                    keyConfig={keyConfig}
+                    onKeyChange={setKeyConfig}
+                  />
+                )}
+              </section>
 
-          <div className="lg:col-span-6">
-            {analysis && (
-              <SecurityAnalysisPanel
-                analysis={analysis}
-                customSecret={customSecret}
-                onCustomSecretChange={setCustomSecret}
-                customAnalysis={customAnalysis}
-              />
-            )}
-          </div>
-        </div>
+              <div className="lg:col-span-6">
+                {analysis && (
+                  <SecurityAnalysisPanel
+                    analysis={analysis}
+                    customSecret={customSecret}
+                    onCustomSecretChange={setCustomSecret}
+                    customAnalysis={customAnalysis}
+                  />
+                )}
+              </div>
+            </div>
+          </>
+        )}
 
         <PrivacyFooter />
       </div>
