@@ -203,34 +203,56 @@ jobs:
       - name: Build Android APK
         run: npx tauri android build --apk
 
-      - name: Sign Android APK for direct installation
+      - name: Sign Android APK (persistent keystore for in-place updates)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          APP_VERSION=$(node -p "require('./package.json').version")
           UNSIGNED_APK=$(find src-tauri/gen/android/app/build/outputs/apk -name "*universal*unsigned*.apk" | head -n 1)
           if [ -z "$UNSIGNED_APK" ]; then
             UNSIGNED_APK=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" | head -n 1)
           fi
           BUILD_TOOLS="$ANDROID_HOME/build-tools/34.0.0"
-          keytool -genkey -v -keystore /tmp/ciphergen-release.jks \
-            -alias ciphergen -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass ciphergen2026 -keypass ciphergen2026 \
-            -dname "CN=CipherGenX, OU=Personal, O=voidechoes7, L=Local, ST=Local, C=US"
+
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "Using persistent GitHub Secrets keystore (enables in-place Android upgrades)."
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > /tmp/ciphergen-release.jks
+            KS_PASS="$ANDROID_KEYSTORE_PASSWORD"
+            KEY_ALIAS="${ANDROID_KEY_ALIAS:-ciphergen}"
+            KEY_PASS="${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}"
+          else
+            echo "::warning::ANDROID_KEYSTORE_BASE64 secret not set; generating ephemeral keystore (requires uninstall before upgrading on Android)."
+            KS_PASS="ciphergen2026"
+            KEY_ALIAS="ciphergen"
+            KEY_PASS="ciphergen2026"
+            keytool -genkey -v -keystore /tmp/ciphergen-release.jks \
+              -alias "$KEY_ALIAS" -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$KS_PASS" -keypass "$KEY_PASS" \
+              -dname "CN=CipherGenX, OU=Personal, O=voidechoes7, L=Local, ST=Local, C=US"
+          fi
+
           mkdir -p build/android
+          OUT_APK="build/android/CipherGen_${APP_VERSION}_Android_universal-signed.apk"
           "$BUILD_TOOLS/zipalign" -f -p 4 "$UNSIGNED_APK" build/android/CipherGen-aligned.apk
           "$BUILD_TOOLS/apksigner" sign \
             --ks /tmp/ciphergen-release.jks \
-            --ks-key-alias ciphergen \
-            --ks-pass pass:ciphergen2026 \
-            --key-pass pass:ciphergen2026 \
-            --out build/android/CipherGen_1.0.1_Android_universal-signed.apk \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass "pass:$KS_PASS" \
+            --key-pass "pass:$KEY_PASS" \
+            --out "$OUT_APK" \
             build/android/CipherGen-aligned.apk
-          "$BUILD_TOOLS/apksigner" verify build/android/CipherGen_1.0.1_Android_universal-signed.apk
-          ls -lh build/android/CipherGen_1.0.1_Android_universal-signed.apk
+          "$BUILD_TOOLS/apksigner" verify "$OUT_APK"
+          rm -f /tmp/ciphergen-release.jks
+          ls -lh "$OUT_APK"
 
       - name: Upload Android .apk artifact
         uses: actions/upload-artifact@v4
         with:
           name: CipherGen-Android-APK
-          path: build/android/CipherGen_1.0.1_Android_universal-signed.apk
+          path: build/android/CipherGen_*_Android_universal-signed.apk
           if-no-files-found: error
 
   build-ios-unsigned:
@@ -276,6 +298,7 @@ jobs:
 
       - name: Disable code signing in generated Xcode project & build unsigned .ipa
         run: |
+          APP_VERSION=$(node -p "require('./package.json').version")
           PBXPROJ=$(find src-tauri/gen/apple -maxdepth 3 -name "project.pbxproj" | head -n 1)
           echo "Patching $PBXPROJ to disable code signing for unsigned IPA build..."
           python3 - "$PBXPROJ" <<'PYEOF'
@@ -309,14 +332,15 @@ jobs:
           echo "Found compiled unsigned .app: $APP_PATH"
           mkdir -p build/ipa/Payload
           cp -R "$APP_PATH" build/ipa/Payload/
-          (cd build/ipa && zip -qry ../CipherGen_1.0.1_iOS-unsigned.ipa Payload)
-          ls -lh build/CipherGen_1.0.1_iOS-unsigned.ipa
+          OUT_IPA="CipherGen_${APP_VERSION}_iOS-unsigned.ipa"
+          (cd build/ipa && zip -qry "../$OUT_IPA" Payload)
+          ls -lh "build/$OUT_IPA"
 
       - name: Upload unsigned iOS .ipa artifact
         uses: actions/upload-artifact@v4
         with:
           name: CipherGen-iOS-Unsigned-IPA
-          path: build/CipherGen_1.0.1_iOS-unsigned.ipa
+          path: build/CipherGen_*_iOS-unsigned.ipa
           if-no-files-found: error
 
   publish-release:
