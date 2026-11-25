@@ -149,7 +149,7 @@ export function SplashScreen({
         </div>
 
         <p className="mt-6 text-[10px] text-slate-500">
-          v1.1.1 • All Rights Reserved — Private Personal Use
+          v1.1.2 • All Rights Reserved — Private Personal Use
         </p>
       </div>
     </div>

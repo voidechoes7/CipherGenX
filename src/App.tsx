@@ -291,102 +291,105 @@ export default function App() {
     []
   );
 
-  const runGeneration = useCallback(async () => {
-    if (activeTab === "analyzer" || activeTab === "vault") return;
-    try {
-      setError(null);
-      if (activeTab === "password") {
-        const res = await generatePasswords({
-          ...passwordConfig,
-          count: batchCount,
-        });
-        setItems(res.items);
-        setEffectiveAlphabetSize(res.effectiveAlphabetSize);
-        setAnalysis(res.analysis);
-        recordGeneratedItems(res.items);
-      } else if (activeTab === "passphrase") {
-        const res = await generatePassphrases({
-          ...passphraseConfig,
-          count: batchCount,
-        });
-        setItems(res.items);
-        setAnalysis(res.analysis);
-        recordGeneratedItems(res.items);
-      } else if (keySubMode === "pin") {
-        const res = await generatePins({
-          ...pinConfig,
-          count: batchCount,
-        });
-        setItems(res.items);
-        setAnalysis(res.analysis);
-        recordGeneratedItems(res.items);
-      } else if (keySubMode === "uuid") {
-        const res = await generateUuids({
-          ...uuidConfig,
-          count: batchCount,
-        });
-        setItems(res.items);
-        setAnalysis(res.analysis);
-        recordGeneratedItems(res.items);
-      } else if (keySubMode === "bip39") {
-        const res = await generateBip39({
-          ...bip39Config,
-          count: batchCount,
-        });
-        setItems(res.items);
-        setAnalysis(res.analysis);
-        recordGeneratedItems(res.items);
-      } else if (keySubMode === "recovery") {
-        const res = await generateRecoveryCodes({
-          ...recoveryConfig,
-          count: batchCount,
-        });
-        setItems(res.items);
-        setAnalysis(res.analysis);
-        recordGeneratedItems(res.items);
-      } else {
-        const format =
-          keySubMode === "hex"
-            ? "hex"
-            : keySubMode === "base32"
-            ? "base32"
-            : "base64Url";
-        const bits =
-          format === "base32" &&
-          (keyConfig.bits === "192" || keyConfig.bits === "512")
-            ? "256"
-            : keyConfig.bits;
-        const res = await generateKeys({
-          ...keyConfig,
-          format,
-          bits,
-          count: batchCount,
-        });
-        setItems(res.items);
-        setAnalysis(res.analysis);
-        recordGeneratedItems(res.items);
+  const runGeneration = useCallback(
+    async (recordInHistory = false) => {
+      if (activeTab === "analyzer" || activeTab === "vault") return;
+      try {
+        setError(null);
+        if (activeTab === "password") {
+          const res = await generatePasswords({
+            ...passwordConfig,
+            count: batchCount,
+          });
+          setItems(res.items);
+          setEffectiveAlphabetSize(res.effectiveAlphabetSize);
+          setAnalysis(res.analysis);
+          if (recordInHistory) recordGeneratedItems(res.items);
+        } else if (activeTab === "passphrase") {
+          const res = await generatePassphrases({
+            ...passphraseConfig,
+            count: batchCount,
+          });
+          setItems(res.items);
+          setAnalysis(res.analysis);
+          if (recordInHistory) recordGeneratedItems(res.items);
+        } else if (keySubMode === "pin") {
+          const res = await generatePins({
+            ...pinConfig,
+            count: batchCount,
+          });
+          setItems(res.items);
+          setAnalysis(res.analysis);
+          if (recordInHistory) recordGeneratedItems(res.items);
+        } else if (keySubMode === "uuid") {
+          const res = await generateUuids({
+            ...uuidConfig,
+            count: batchCount,
+          });
+          setItems(res.items);
+          setAnalysis(res.analysis);
+          if (recordInHistory) recordGeneratedItems(res.items);
+        } else if (keySubMode === "bip39") {
+          const res = await generateBip39({
+            ...bip39Config,
+            count: batchCount,
+          });
+          setItems(res.items);
+          setAnalysis(res.analysis);
+          if (recordInHistory) recordGeneratedItems(res.items);
+        } else if (keySubMode === "recovery") {
+          const res = await generateRecoveryCodes({
+            ...recoveryConfig,
+            count: batchCount,
+          });
+          setItems(res.items);
+          setAnalysis(res.analysis);
+          if (recordInHistory) recordGeneratedItems(res.items);
+        } else {
+          const format =
+            keySubMode === "hex"
+              ? "hex"
+              : keySubMode === "base32"
+              ? "base32"
+              : "base64Url";
+          const bits =
+            format === "base32" &&
+            (keyConfig.bits === "192" || keyConfig.bits === "512")
+              ? "256"
+              : keyConfig.bits;
+          const res = await generateKeys({
+            ...keyConfig,
+            format,
+            bits,
+            count: batchCount,
+          });
+          setItems(res.items);
+          setAnalysis(res.analysis);
+          if (recordInHistory) recordGeneratedItems(res.items);
+        }
+        setCopiedIndex(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
       }
-      setCopiedIndex(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-  }, [
-    activeTab,
-    batchCount,
-    bip39Config,
-    keyConfig,
-    keySubMode,
-    passphraseConfig,
-    passwordConfig,
-    pinConfig,
-    recordGeneratedItems,
-    recoveryConfig,
-    uuidConfig,
-  ]);
+    },
+    [
+      activeTab,
+      batchCount,
+      bip39Config,
+      keyConfig,
+      keySubMode,
+      passphraseConfig,
+      passwordConfig,
+      pinConfig,
+      recordGeneratedItems,
+      recoveryConfig,
+      uuidConfig,
+    ]
+  );
 
   useEffect(() => {
     if (unlocked) {
-      void runGeneration();
+      void runGeneration(false);
     }
   }, [runGeneration, unlocked]);
 
@@ -416,8 +419,12 @@ export default function App() {
     async (value: string, index: number) => {
       await handleCopyPlain(value);
       setCopiedIndex(index);
+      const item = items[index];
+      if (item) {
+        recordGeneratedItems([item]);
+      }
     },
-    [handleCopyPlain]
+    [handleCopyPlain, items, recordGeneratedItems]
   );
 
   const handleCopyAll = async () => {
@@ -425,6 +432,7 @@ export default function App() {
     const joined = items.map((i) => i.value).join("\n");
     await handleCopyPlain(joined);
     setCopiedIndex("all");
+    recordGeneratedItems(items);
   };
 
   const handleClearClipboard = useCallback(async () => {
@@ -453,6 +461,33 @@ export default function App() {
     },
     [handlePanicWipe]
   );
+
+  // Always destroy ephemeral RAM history immediately when minimizing, backgrounding, or closing the app
+  useEffect(() => {
+    const wipeEphemeralRam = () => {
+      setRamHistory([]);
+      setHistoryOpen(false);
+      setQrTarget(null);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        wipeEphemeralRam();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", wipeEphemeralRam);
+    window.addEventListener("beforeunload", wipeEphemeralRam);
+    document.addEventListener("freeze", wipeEphemeralRam);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", wipeEphemeralRam);
+      window.removeEventListener("beforeunload", wipeEphemeralRam);
+      document.removeEventListener("freeze", wipeEphemeralRam);
+    };
+  }, []);
 
   // Auto-lock on minimize / background (desktop minimize + mobile background)
   useEffect(() => {
@@ -592,7 +627,7 @@ export default function App() {
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "g") {
         e.preventDefault();
-        void runGeneration();
+        void runGeneration(true);
       } else if (
         (e.ctrlKey || e.metaKey) &&
         e.shiftKey &&
@@ -714,7 +749,7 @@ export default function App() {
               onCopyPlain={(val) => void handleCopyPlain(val)}
               onCopyAll={handleCopyAll}
               onClearClipboard={handleClearClipboard}
-              onRegenerate={runGeneration}
+              onRegenerate={() => void runGeneration(true)}
               onShowQr={(value, label, entropyBits) =>
                 setQrTarget({ value, label, entropyBits })
               }

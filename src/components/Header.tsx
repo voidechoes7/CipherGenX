@@ -75,7 +75,7 @@ export function Header({
                 border: "1px solid var(--border-accent)",
               }}
             >
-              v1.1.1
+              v1.1.2
             </span>
           </div>
           <p className="text-xs text-slate-400">
