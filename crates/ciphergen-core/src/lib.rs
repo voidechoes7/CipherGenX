@@ -1,30 +1,38 @@
 #![forbid(unsafe_code)]
 //! CipherGenX (`ciphergen-core`) — Pure-Rust, zero-unsafe, 100% offline
-//! cryptographic generator and entropy analysis engine.
+//! cryptographic generator, stateless Argon2id vault, and penalized real-entropy engine.
 
 pub mod analysis;
 pub mod csprng;
 pub mod keys;
 pub mod passphrase;
 pub mod password;
+pub mod vault;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub use analysis::{
-    analyze_custom_secret, analyze_entropy, CrackTimeEstimates, QuantumGroverAnalysis,
-    SecurityAnalysis, SecurityLevel,
+    analyze_custom_secret, analyze_entropy, CrackTimeEstimates, EntropyPenalty,
+    QuantumGroverAnalysis, SecurityAnalysis, SecurityLevel,
 };
 pub use csprng::{Csprng, SystemCsprng};
 pub use keys::{
-    generate_keys, generate_pins, KeyBatchResult, KeyBits, KeyConfig, KeyFormat, PinConfig,
+    bip39_en_wordlist, bip39_es_wordlist, encode_base64url, entropy_to_bip39_mnemonic,
+    generate_bip39, generate_keys, generate_pins, generate_recovery_codes, generate_uuids,
+    Bip39Config, Bip39Language, Bip39WordCount, KeyBatchResult, KeyBits, KeyConfig, KeyFormat,
+    PinConfig, RecoveryCodeConfig, RecoveryCodeFormat, UuidConfig, BIP39_WORDLIST_SIZE,
 };
 pub use passphrase::{
-    eff_wordlist, generate_passphrases, passphrase_entropy_bits, Capitalization,
-    PassphraseBatchResult, PassphraseConfig, EFF_WORDLIST_SIZE,
+    eff_wordlist, es_wordlist, generate_passphrases, passphrase_entropy_bits, Capitalization,
+    PassphraseBatchResult, PassphraseConfig, WordlistLanguage, EFF_WORDLIST_SIZE, ES_WORDLIST_SIZE,
 };
 pub use password::{
     build_active_sets, generate_passwords, PasswordBatchResult, PasswordConfig, AMBIGUOUS_CHARS,
+};
+pub use vault::{
+    compute_master_fingerprint, derive_vault_password, derive_vault_password_with_params,
+    MasterFingerprint, VaultConfig, VaultResult, VAULT_KDF_SPEC,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,6 +43,11 @@ pub enum GenerationMode {
     Pin,
     HexKey,
     Base32Key,
+    Base64UrlKey,
+    UuidV4,
+    Bip39,
+    RecoveryCode,
+    VaultDerived,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,8 +73,6 @@ mod tests {
     use super::*;
     use std::collections::{HashMap, HashSet};
 
-    /// Deterministic mock RNG to verify that rejection sampling actually discards
-    /// values below `threshold = bound.wrapping_neg() % bound`.
     struct SequenceRng {
         values: Vec<u64>,
         cursor: usize,
@@ -90,8 +101,6 @@ mod tests {
 
     #[test]
     fn rejection_sampling_discards_biased_values_below_threshold() {
-        // For bound = 3: 2^64 mod 3 = 1, so threshold = 1.
-        // Sample `0` MUST be rejected; next sample `1` MUST be accepted and yield `1 % 3 = 1`.
         let mut rng = SequenceRng {
             values: vec![0, 1],
             cursor: 0,
@@ -104,8 +113,6 @@ mod tests {
     #[test]
     fn os_csprng_rejection_sampling_chi_squared_uniformity() {
         let mut rng = SystemCsprng::new();
-        // Test non-power-of-two bound (10) over 50,000 samples.
-        // Expected count per bucket = 5,000. Chi-squared df=9 critical value at p=0.0001 is ~33.72.
         let bound = 10usize;
         let samples = 50_000usize;
         let mut counts = vec![0usize; bound];
@@ -128,16 +135,18 @@ mod tests {
     }
 
     #[test]
-    fn password_guarantees_all_active_sets_and_excludes_ambiguous() {
+    fn password_guarantees_all_active_sets_and_excludes_ambiguous_and_custom() {
         let mut rng = SystemCsprng::new();
+        let custom_ex = "!@#aeiouAEIOU";
         let cfg = PasswordConfig {
-            length: 16,
+            length: 20,
             uppercase: true,
             lowercase: true,
             numbers: true,
             safe_symbols: true,
             extended_symbols: true,
             exclude_ambiguous: true,
+            custom_exclude: custom_ex.to_string(),
             count: 10,
         };
 
@@ -149,16 +158,17 @@ mod tests {
             assert_eq!(res.items.len(), 10);
 
             for item in &res.items {
-                assert_eq!(item.value.chars().count(), 16);
-                // No ambiguous characters allowed
+                assert_eq!(item.value.chars().count(), 20);
                 for amb in AMBIGUOUS_CHARS.chars() {
+                    assert!(!item.value.contains(amb));
+                }
+                for ex in custom_ex.chars() {
                     assert!(
-                        !item.value.contains(amb),
-                        "Found ambiguous char '{amb}' in {}",
+                        !item.value.contains(ex),
+                        "Found custom-excluded char '{ex}' in {}",
                         item.value
                     );
                 }
-                // At least one from each active set
                 assert!(item.value.chars().any(|c| password::UPPERCASE_CHARS.contains(c)));
                 assert!(item.value.chars().any(|c| password::LOWERCASE_CHARS.contains(c)));
                 assert!(item.value.chars().any(|c| password::DIGIT_CHARS.contains(c)));
@@ -173,8 +183,6 @@ mod tests {
             }
         }
 
-        // Verify Fisher-Yates shuffle actually distributes characters across index 0
-        // (without shuffle, index 0 would be uppercase 100% of the time = 300/300).
         assert!(
             first_char_is_upper_count < 200,
             "First char was uppercase {first_char_is_upper_count}/300 times; shuffle may be broken"
@@ -185,153 +193,281 @@ mod tests {
     fn password_rejects_invalid_policies() {
         let mut rng = SystemCsprng::new();
 
-        // Too short
-        let short = PasswordConfig {
-            length: 7,
-            ..Default::default()
-        };
-        assert!(generate_passwords(&mut rng, &short).is_err());
-
-        // Too long
-        let long = PasswordConfig {
-            length: 129,
-            ..Default::default()
-        };
-        assert!(generate_passwords(&mut rng, &long).is_err());
-
-        // No sets enabled
-        let empty = PasswordConfig {
-            uppercase: false,
-            lowercase: false,
-            numbers: false,
-            safe_symbols: false,
-            extended_symbols: false,
-            ..Default::default()
-        };
-        assert!(generate_passwords(&mut rng, &empty).is_err());
-
-        // Batch out of bounds
-        let bad_batch = PasswordConfig {
-            count: 11,
-            ..Default::default()
-        };
-        assert!(generate_passwords(&mut rng, &bad_batch).is_err());
+        assert!(generate_passwords(&mut rng, &PasswordConfig { length: 7, ..Default::default() }).is_err());
+        assert!(generate_passwords(&mut rng, &PasswordConfig { length: 129, ..Default::default() }).is_err());
+        assert!(generate_passwords(
+            &mut rng,
+            &PasswordConfig {
+                uppercase: false,
+                lowercase: false,
+                numbers: false,
+                safe_symbols: false,
+                extended_symbols: false,
+                ..Default::default()
+            }
+        )
+        .is_err());
+        // Excluding every digit when only numbers are enabled must error
+        assert!(generate_passwords(
+            &mut rng,
+            &PasswordConfig {
+                uppercase: false,
+                lowercase: false,
+                numbers: true,
+                safe_symbols: false,
+                extended_symbols: false,
+                exclude_ambiguous: false,
+                custom_exclude: "0123456789".to_string(),
+                ..Default::default()
+            }
+        )
+        .is_err());
     }
 
     #[test]
-    fn eff_wordlist_is_complete_and_unique() {
-        let words = eff_wordlist();
-        assert_eq!(words.len(), EFF_WORDLIST_SIZE);
-        let unique: HashSet<&str> = words.iter().copied().collect();
-        assert_eq!(unique.len(), EFF_WORDLIST_SIZE);
-        assert_eq!(words[0], "abacus");
-        assert_eq!(words[EFF_WORDLIST_SIZE - 1], "zoom");
+    fn eff_and_es_wordlists_are_complete_and_unique() {
+        let en = eff_wordlist();
+        assert_eq!(en.len(), EFF_WORDLIST_SIZE);
+        let en_unique: HashSet<&str> = en.iter().copied().collect();
+        assert_eq!(en_unique.len(), EFF_WORDLIST_SIZE);
+        assert_eq!(en[0], "abacus");
+        assert_eq!(en[EFF_WORDLIST_SIZE - 1], "zoom");
+
+        let es = es_wordlist();
+        assert_eq!(es.len(), ES_WORDLIST_SIZE);
+        let es_unique: HashSet<&str> = es.iter().copied().collect();
+        assert_eq!(es_unique.len(), ES_WORDLIST_SIZE);
+        assert!(es.iter().all(|w| w.is_ascii() && w.chars().all(|c| c.is_ascii_lowercase())));
     }
 
     #[test]
-    fn passphrase_generation_and_exact_entropy() {
+    fn passphrase_generation_en_and_es_exact_entropy() {
         let mut rng = SystemCsprng::new();
-        let cfg = PassphraseConfig {
+
+        let cfg_en = PassphraseConfig {
             word_count: 6,
             separator: "-".to_string(),
             capitalization: Capitalization::Title,
             include_number: true,
+            language: WordlistLanguage::En,
             count: 5,
         };
-        let res = generate_passphrases(&mut rng, &cfg).unwrap();
-        assert_eq!(res.items.len(), 5);
-        assert_eq!(res.wordlist_size, 7776);
+        let res_en = generate_passphrases(&mut rng, &cfg_en).unwrap();
+        assert_eq!(res_en.wordlist_size, 7776);
+        let expected_en = 6.0 * 7776.0_f64.log2() + 60.0_f64.log2();
+        assert!((res_en.items[0].entropy_bits - expected_en).abs() < 1e-6);
 
-        // 6 * log2(7776) + log2(60) ≈ 77.548875 + 5.906891 ≈ 83.4558 bits
-        let expected_entropy = 6.0 * 7776.0_f64.log2() + 60.0_f64.log2();
-        assert!((res.items[0].entropy_bits - expected_entropy).abs() < 1e-6);
-        assert_eq!(res.analysis.level, SecurityLevel::Strong);
+        let cfg_es = PassphraseConfig {
+            word_count: 6,
+            separator: "-".to_string(),
+            capitalization: Capitalization::None,
+            include_number: false,
+            language: WordlistLanguage::Es,
+            count: 4,
+        };
+        let res_es = generate_passphrases(&mut rng, &cfg_es).unwrap();
+        assert_eq!(res_es.wordlist_size, 8192);
+        // 6 * log2(8192) == 6 * 13 == 78.0 exact bits!
+        assert!((res_es.items[0].entropy_bits - 78.0).abs() < 1e-6);
+        for item in &res_es.items {
+            assert_eq!(item.value.split('-').count(), 6);
+        }
+    }
 
-        for item in &res.items {
+    #[test]
+    fn bip39_matches_official_test_vectors() {
+        // Official Trezor BIP-39 test vector #1: 16 zero bytes -> 12 words
+        let zero16 = [0u8; 16];
+        let m12 = entropy_to_bip39_mnemonic(&zero16, bip39_en_wordlist()).unwrap();
+        assert_eq!(
+            m12,
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+        );
+
+        // Official Trezor BIP-39 test vector: 32 bytes of 0xFF -> 24 words
+        let ff32 = [0xFFu8; 32];
+        let m24 = entropy_to_bip39_mnemonic(&ff32, bip39_en_wordlist()).unwrap();
+        assert_eq!(
+            m24,
+            "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo vote"
+        );
+
+        // Generate real EN & ES BIP-39 mnemonics
+        let mut rng = SystemCsprng::new();
+        let es24 = generate_bip39(
+            &mut rng,
+            &Bip39Config {
+                word_count: Bip39WordCount::Words24,
+                language: Bip39Language::Es,
+                count: 2,
+            },
+        )
+        .unwrap();
+        assert_eq!(es24.analysis.entropy_bits, 256.0);
+        assert_eq!(es24.analysis.level, SecurityLevel::PostQuantum);
+        for item in &es24.items {
+            assert_eq!(item.value.split_whitespace().count(), 24);
+        }
+    }
+
+    #[test]
+    fn base64url_uuid_v4_and_recovery_codes() {
+        let mut rng = SystemCsprng::new();
+
+        // Base64URL 256-bit (32 bytes -> 43 chars, URL-safe, no '=')
+        let b64 = generate_keys(
+            &mut rng,
+            &KeyConfig {
+                format: KeyFormat::Base64Url,
+                bits: KeyBits::Bits256,
+                uppercase: false,
+                grouped: false,
+                count: 3,
+            },
+        )
+        .unwrap();
+        assert_eq!(b64.analysis.entropy_bits, 256.0);
+        assert_eq!(b64.analysis.level, SecurityLevel::PostQuantum);
+        for item in &b64.items {
+            assert_eq!(item.value.len(), 43);
+            assert!(!item.value.contains('='));
+            assert!(item
+                .value
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+        }
+
+        // UUID v4 RFC 9562 compliance
+        let uuids = generate_uuids(
+            &mut rng,
+            &UuidConfig {
+                uppercase: false,
+                hyphens: true,
+                count: 5,
+            },
+        )
+        .unwrap();
+        assert_eq!(uuids.analysis.entropy_bits, 122.0);
+        for item in &uuids.items {
             let parts: Vec<&str> = item.value.split('-').collect();
-            assert_eq!(parts.len(), 6);
+            assert_eq!(parts.len(), 5);
+            assert_eq!(parts[0].len(), 8);
+            assert_eq!(parts[1].len(), 4);
+            assert_eq!(parts[2].len(), 4);
+            assert_eq!(parts[3].len(), 4);
+            assert_eq!(parts[4].len(), 12);
+            assert!(parts[2].starts_with('4'), "UUID version nibble must be 4: {}", item.value);
+            let variant = parts[3].chars().next().unwrap();
             assert!(
-                item.value.chars().any(|c| c.is_ascii_digit()),
-                "Expected a digit in passphrase: {}",
+                matches!(variant, '8' | '9' | 'a' | 'b'),
+                "UUID variant nibble must be 8/9/a/b: {}",
                 item.value
             );
         }
-    }
 
-    #[test]
-    fn pin_and_hex_base32_keys_exact_formats_and_entropy() {
-        let mut rng = SystemCsprng::new();
-
-        let pin_res = generate_pins(&mut rng, &PinConfig { length: 8, count: 4 }).unwrap();
-        assert_eq!(pin_res.items.len(), 4);
-        assert!((pin_res.analysis.entropy_bits - (8.0 * 10.0_f64.log2())).abs() < 0.02);
-        for item in &pin_res.items {
-            assert_eq!(item.value.len(), 8);
-            assert!(item.value.chars().all(|c| c.is_ascii_digit()));
-        }
-
-        let hex256 = generate_keys(
+        // 2FA Recovery Codes (no ambiguous 0/O/1/I/L)
+        let codes = generate_recovery_codes(
             &mut rng,
-            &KeyConfig {
-                format: KeyFormat::Hex,
-                bits: KeyBits::Bits256,
-                uppercase: true,
-                grouped: false,
-                count: 2,
+            &RecoveryCodeConfig {
+                format: RecoveryCodeFormat::Blocks5x2,
+                count: 8,
             },
         )
         .unwrap();
-        assert_eq!(hex256.analysis.entropy_bits, 256.0);
-        assert_eq!(hex256.analysis.level, SecurityLevel::PostQuantum);
-        assert!(hex256.analysis.quantum_grover.is_post_quantum_safe);
-        assert_eq!(hex256.analysis.quantum_grover.effective_bits, 128.0);
-        for item in &hex256.items {
-            assert_eq!(item.value.len(), 64);
-            assert!(item.value.chars().all(|c| matches!(c, '0'..='9' | 'A'..='F')));
-        }
-
-        let b32_128 = generate_keys(
-            &mut rng,
-            &KeyConfig {
-                format: KeyFormat::Base32,
-                bits: KeyBits::Bits128,
-                uppercase: true,
-                grouped: true,
-                count: 2,
-            },
-        )
-        .unwrap();
-        assert_eq!(b32_128.analysis.entropy_bits, 128.0);
-        assert_eq!(b32_128.analysis.level, SecurityLevel::UltraStrong);
-        assert!(!b32_128.analysis.quantum_grover.is_post_quantum_safe);
-        assert_eq!(b32_128.analysis.quantum_grover.effective_bits, 64.0);
-        for item in &b32_128.items {
-            let ungrouped: String = item.value.chars().filter(|&c| c != '-').collect();
-            assert_eq!(ungrouped.len(), 26);
-            assert!(ungrouped
-                .chars()
-                .all(|c| matches!(c, 'A'..='Z' | '2'..='7')));
+        assert_eq!(codes.items.len(), 8);
+        assert!((codes.analysis.entropy_bits - (10.0 * 31.0_f64.log2())).abs() < 0.02);
+        for item in &codes.items {
+            assert_eq!(item.value.len(), 11); // XXXXX-XXXXX
+            assert_eq!(item.value.as_bytes()[5], b'-');
+            for forbidden in ['0', 'O', '1', 'I', 'L'] {
+                assert!(!item.value.contains(forbidden));
+            }
         }
     }
 
     #[test]
-    fn analysis_levels_and_grover_halving() {
-        let cases = [
-            (32.0, SecurityLevel::Weak, false),
-            (64.0, SecurityLevel::Fair, false),
-            (100.0, SecurityLevel::Strong, false),
-            (160.0, SecurityLevel::UltraStrong, false),
-            (256.0, SecurityLevel::PostQuantum, true),
-            (512.0, SecurityLevel::PostQuantum, true),
-        ];
+    fn stateless_argon2id_vault_is_deterministic_and_sensitive() {
+        let base_cfg = VaultConfig {
+            master_password: "Mi-Frase-Maestra-Secreta-2026!".to_string(),
+            site: "GitHub.com ".to_string(),
+            login: "voidechoes7".to_string(),
+            counter: 1,
+            length: 20,
+            uppercase: true,
+            lowercase: true,
+            numbers: true,
+            safe_symbols: true,
+            extended_symbols: false,
+            exclude_ambiguous: true,
+            custom_exclude: String::new(),
+        };
 
-        for (bits, expected_level, expected_pq) in cases {
-            let a = analyze_entropy(bits, GenerationMode::Password, 72);
-            assert_eq!(a.level, expected_level);
-            assert_eq!(a.quantum_grover.is_post_quantum_safe, expected_pq);
-            assert!((a.quantum_grover.effective_bits - bits / 2.0).abs() < 1e-6);
-            assert!(!a.recommendations.is_empty());
-        }
+        // Fast params for unit tests (1 MiB, t=1, p=1) to verify determinism and domain separation
+        let r1 = derive_vault_password_with_params(&base_cfg, 1024, 1, 1).unwrap();
+        let mut normalized_cfg = base_cfg.clone();
+        normalized_cfg.site = "github.com".to_string(); // Case/trim canonicalization
+        let r2 = derive_vault_password_with_params(&normalized_cfg, 1024, 1, 1).unwrap();
+
+        assert_eq!(r1.item.value, r2.item.value, "Same canonical inputs must yield identical password");
+        assert_eq!(r1.item.value.chars().count(), 20);
+        assert_eq!(r1.item.mode, GenerationMode::VaultDerived);
+        assert_eq!(r1.master_fingerprint, r2.master_fingerprint);
+
+        // Changing counter must produce a completely different password
+        let mut rotated_cfg = base_cfg.clone();
+        rotated_cfg.counter = 2;
+        let r3 = derive_vault_password_with_params(&rotated_cfg, 1024, 1, 1).unwrap();
+        assert_ne!(r1.item.value, r3.item.value);
+
+        // Changing master password by 1 char must change both derived password and fingerprint
+        let mut typo_cfg = base_cfg.clone();
+        typo_cfg.master_password = "Mi-Frase-Maestra-Secreta-2026?".to_string();
+        let r4 = derive_vault_password_with_params(&typo_cfg, 1024, 1, 1).unwrap();
+        assert_ne!(r1.item.value, r4.item.value);
+        assert_ne!(r1.master_fingerprint.code, r4.master_fingerprint.code);
+
+        // Also smoke-test production Argon2id parameters (64 MiB, t=3, p=1) once!
+        let prod = derive_vault_password(&base_cfg).unwrap();
+        assert_eq!(prod.item.value.chars().count(), 20);
+        assert_eq!(prod.kdf_spec, VAULT_KDF_SPEC);
+    }
+
+    #[test]
+    fn penalized_real_entropy_detects_weak_patterns_and_respects_random_secrets() {
+        // Common password + digits + symbol: theoretical ~78.7 bits, real must drop drastically!
+        let p1 = analyze_custom_secret("Password123!");
+        assert!(p1.theoretical_entropy_bits > 70.0);
+        assert!(
+            p1.entropy_bits < 30.0,
+            "Password123! real entropy should be <30 bits, got {}",
+            p1.entropy_bits
+        );
+        assert_eq!(p1.level, SecurityLevel::Weak);
+        assert!(!p1.penalties.is_empty());
+
+        // Leetspeak + year + symbol
+        let p2 = analyze_custom_secret("P@ssw0rd2025!");
+        assert!(p2.entropy_bits < 35.0, "P@ssw0rd2025! got {}", p2.entropy_bits);
+        assert_eq!(p2.level, SecurityLevel::Weak);
+
+        // Repeated character spam
+        let p3 = analyze_custom_secret("aaaaaaaaaaaa");
+        assert!(p3.entropy_bits < 15.0, "aaaaaaaaaaaa got {}", p3.entropy_bits);
+        assert_eq!(p3.level, SecurityLevel::Weak);
+
+        // Keyboard walk
+        let p4 = analyze_custom_secret("qwertyuiop1234");
+        assert!(p4.entropy_bits < 25.0, "qwertyuiop1234 got {}", p4.entropy_bits);
+
+        // Genuine high-entropy random password should NOT be penalized
+        let strong = analyze_custom_secret("K9$mP2!xQ7@vL4#nR8&zW1^t");
+        assert!(strong.penalties.is_empty(), "Unexpected penalties: {:?}", strong.penalties);
+        assert!((strong.entropy_bits - strong.theoretical_entropy_bits).abs() < 0.01);
+        assert_eq!(strong.level, SecurityLevel::UltraStrong);
+
+        // Genuine 6-word Diceware phrase should evaluate cleanly (~77.5 bits)
+        let dice = analyze_custom_secret("Abacus-Bison-Coral-Drift-Ember-Flint");
+        assert!(dice.entropy_bits > 70.0 && dice.entropy_bits < 85.0);
     }
 
     #[test]

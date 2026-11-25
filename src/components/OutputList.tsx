@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   Copy,
   Check,
@@ -7,9 +8,13 @@ import {
   Timer,
   Trash2,
   Layers,
+  QrCode,
+  Radio,
 } from "lucide-react";
 import type { ClipboardTimerState } from "../lib/clipboard";
 import type { ClipboardTtl, GeneratedItem } from "../types/ciphergen";
+import { MODE_LABELS } from "../lib/ramHistory";
+import { NatoSpellingView } from "./NatoSpellingView";
 
 interface OutputListProps {
   items: GeneratedItem[];
@@ -22,21 +27,45 @@ interface OutputListProps {
   timerState: ClipboardTimerState;
   copiedIndex: number | "all" | null;
   onCopyItem: (value: string, index: number) => void;
+  onCopyPlain: (value: string) => void;
   onCopyAll: () => void;
   onClearClipboard: () => void;
   onRegenerate: () => void;
+  onShowQr: (value: string, label: string, entropyBits: number) => void;
 }
 
-function renderHighlightedSecret(value: string, masked: boolean) {
+function renderHighlightedSecret(item: GeneratedItem, masked: boolean) {
   if (masked) {
     return (
       <span className="tracking-widest text-slate-400">
-        {"•".repeat(Math.min(value.length, 36))}
+        {"•".repeat(Math.min(item.value.length, 36))}
       </span>
     );
   }
 
-  return [...value].map((ch, idx) => {
+  // Render BIP-39 seed words as numbered pills for effortless offline verification
+  if (item.mode === "bip39") {
+    const words = item.value.split(/\s+/).filter(Boolean);
+    return (
+      <span className="flex flex-wrap gap-1.5 pt-0.5">
+        {words.map((w, i) => (
+          <span
+            key={i}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-700/70 bg-slate-900/60 px-2 py-0.5 text-xs"
+          >
+            <span className="font-mono text-[10px] text-slate-500">
+              {i + 1}.
+            </span>
+            <span className="font-mono-secret font-semibold text-slate-100">
+              {w}
+            </span>
+          </span>
+        ))}
+      </span>
+    );
+  }
+
+  return [...item.value].map((ch, idx) => {
     if (/[0-9]/.test(ch)) {
       return (
         <span key={idx} className="text-cyan-300">
@@ -70,10 +99,18 @@ export function OutputList({
   timerState,
   copiedIndex,
   onCopyItem,
+  onCopyPlain,
   onCopyAll,
   onClearClipboard,
   onRegenerate,
+  onShowQr,
 }: OutputListProps) {
+  const [natoIndex, setNatoIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    setNatoIndex(null);
+  }, [items]);
+
   const progressPct = timerState.active
     ? Math.max(0, (timerState.remainingSeconds / timerState.totalSeconds) * 100)
     : 0;
@@ -155,7 +192,7 @@ export function OutputList({
           <button
             type="button"
             onClick={onRegenerate}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold text-slate-950 transition hover:brightness-110 active:scale-[0.98]"
+            className="btn-accent-text inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition hover:brightness-110 active:scale-[0.98]"
             style={{ backgroundColor: "var(--accent)" }}
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -173,7 +210,7 @@ export function OutputList({
           <button
             type="button"
             onClick={onRegenerate}
-            className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold text-slate-950 transition hover:brightness-110"
+            className="btn-accent-text inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition hover:brightness-110"
             style={{ backgroundColor: "var(--accent)" }}
           >
             <RefreshCw className="h-3.5 w-3.5" />
@@ -181,50 +218,101 @@ export function OutputList({
           </button>
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {items.map((item, idx) => {
             const isCopied = copiedIndex === idx;
+            const showNato = natoIndex === idx;
+            const modeLabel = MODE_LABELS[item.mode] ?? item.mode;
+
             return (
               <div
-                key={`${idx}-${item.value.slice(0, 8)}`}
-                className="cyber-elevated group flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 transition hover:border-slate-600/80"
+                key={`${idx}-${item.value.slice(0, 10)}`}
+                className="cyber-elevated group rounded-xl px-3.5 py-3 transition hover:border-slate-600/80"
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {items.length > 1 && (
-                      <span className="font-mono text-[11px] text-slate-500">
-                        #{idx + 1}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {items.length > 1 && (
+                        <span className="font-mono text-[11px] text-slate-500">
+                          #{idx + 1}
+                        </span>
+                      )}
+                      <code className="font-mono-secret break-all text-sm font-medium leading-relaxed sm:text-base">
+                        {renderHighlightedSecret(item, masked)}
+                      </code>
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
+                      <span className="font-semibold text-slate-400">
+                        {modeLabel}
                       </span>
-                    )}
-                    <code className="font-mono-secret break-all text-sm font-medium leading-relaxed sm:text-base">
-                      {renderHighlightedSecret(item.value, masked)}
-                    </code>
+                      <span>•</span>
+                      <span>
+                        {item.mode === "bip39"
+                          ? `${item.value.split(/\s+/).length} palabras`
+                          : `${[...item.value].length} caracteres`}
+                      </span>
+                      <span>•</span>
+                      <span className="font-mono text-cyan-300/90">
+                        {item.entropyBits.toFixed(1)} bits
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-1 flex items-center gap-2 text-[10px] text-slate-500">
-                    <span>{[...item.value].length} caracteres</span>
-                    <span>•</span>
-                    <span>{item.entropyBits.toFixed(1)} bits</span>
+
+                  <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onShowQr(item.value, modeLabel, item.entropyBits)
+                      }
+                      aria-label={`Código QR elemento ${idx + 1}`}
+                      title="Mostrar código QR offline"
+                      className="flex items-center gap-1 rounded-lg border border-slate-700/80 bg-slate-900/70 px-2.5 py-2 text-xs font-medium text-slate-300 transition hover:border-cyan-400/50 hover:text-white active:scale-95"
+                    >
+                      <QrCode className="h-3.5 w-3.5" />
+                      <span className="hidden md:inline">QR</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setNatoIndex((cur) => (cur === idx ? null : idx))
+                      }
+                      aria-label={`Deletreo NATO elemento ${idx + 1}`}
+                      title="Deletreo fonético NATO"
+                      className={`flex items-center gap-1 rounded-lg border px-2.5 py-2 text-xs font-medium transition active:scale-95 ${
+                        showNato
+                          ? "border-cyan-400/60 bg-cyan-400/15 text-cyan-200"
+                          : "border-slate-700/80 bg-slate-900/70 text-slate-300 hover:border-cyan-400/50 hover:text-white"
+                      }`}
+                    >
+                      <Radio className="h-3.5 w-3.5" />
+                      <span className="hidden md:inline">NATO</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onCopyItem(item.value, idx)}
+                      aria-label={`Copiar elemento ${idx + 1}`}
+                      className="flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white active:scale-95"
+                    >
+                      {isCopied ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-emerald-400" />
+                          <span className="text-emerald-300">Copiado</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3.5 w-3.5" />
+                          <span>Copiar</span>
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => onCopyItem(item.value, idx)}
-                  aria-label={`Copiar elemento ${idx + 1}`}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-900/70 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-slate-500 hover:text-white active:scale-95"
-                >
-                  {isCopied ? (
-                    <>
-                      <Check className="h-3.5 w-3.5 text-emerald-400" />
-                      <span className="text-emerald-300">Copiado</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-3.5 w-3.5" />
-                      <span>Copiar</span>
-                    </>
-                  )}
-                </button>
+                {showNato && !masked && (
+                  <NatoSpellingView value={item.value} onCopyNato={onCopyPlain} />
+                )}
               </div>
             );
           })}

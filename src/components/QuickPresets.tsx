@@ -1,10 +1,12 @@
-import { Zap, Shield, Atom, Key } from "lucide-react";
+import { Zap, Shield, Atom, Key, Sprout, Fingerprint } from "lucide-react";
 
 export type SecurityPresetId =
   | "daily"
   | "masterVault"
   | "postQuantum"
-  | "apiBase32";
+  | "bip39Seed"
+  | "apiBase64Url"
+  | "recoveryKit";
 
 interface QuickPresetsProps {
   onSelect: (preset: SecurityPresetId) => void;
@@ -16,24 +18,36 @@ const PRESETS: {
   tag: string;
   icon: typeof Zap;
 }[] = [
-  { id: "daily", label: "Uso Diario", tag: "20 chars • ~123 bits", icon: Zap },
+  { id: "daily", label: "Uso Diario", tag: "20 chars • ~123b", icon: Zap },
   {
     id: "masterVault",
-    label: "Bóveda Maestra",
-    tag: "7 pal. EFF • ~96 bits",
+    label: "Diceware ES",
+    tag: "7 pal. • ~97b",
     icon: Shield,
   },
   {
     id: "postQuantum",
     label: "Post-Cuántica",
-    tag: "44 chars • ≥256 bits",
+    tag: "44 chars • ≥256b",
     icon: Atom,
   },
   {
-    id: "apiBase32",
-    label: "Llave API / TOTP",
-    tag: "Base32 • 256 bits",
+    id: "bip39Seed",
+    label: "Semilla BIP-39",
+    tag: "24 pal. • 256b",
+    icon: Sprout,
+  },
+  {
+    id: "apiBase64Url",
+    label: "Token API",
+    tag: "Base64URL • 256b",
     icon: Key,
+  },
+  {
+    id: "recoveryKit",
+    label: "Kit 2FA (8)",
+    tag: "XXXXX-XXXXX",
+    icon: Fingerprint,
   },
 ];
 

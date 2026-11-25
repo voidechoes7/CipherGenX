@@ -1,86 +1,73 @@
-# CipherGen (`CipherGenX`)
+# CipherGen (`CipherGenX`) v1.1.0
 
-Aplicación independiente, **100% offline**, ultra segura y sin telemetría de Generación de Contraseñas, Frases de Paso Diceware EFF, PINs y Llaves Criptográficas (Hex/Base32), construida con **Rust puro (`#![forbid(unsafe_code)]`)** y **Tauri 2** para **Windows (`.exe`)**, **Android (`.apk`)**, **iOS (`.ipa` sin firmar)** y **Linux (`.deb` / `.AppImage`)**.
+Suite criptográfica independiente, **100% offline**, ultra segura y sin telemetría construida con **Rust puro (`#![forbid(unsafe_code)]`)** y **Tauri 2** para **Windows (`.exe`)**, **Android (`.apk`)**, **iOS (`.ipa` sin firmar)** y **Linux (`.deb` / `.AppImage`)**.
+
+---
+
+## Descargas Directas — Release `v1.1.0`
+
+| Plataforma | Archivo | Descarga Directa |
+| --- | --- | --- |
+| **Android** | Universal APK firmado (`.apk`) | [CipherGen_1.1.0_Android_universal-signed.apk](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/CipherGen_1.1.0_Android_universal-signed.apk) |
+| **iOS** | IPA sin firmar para AltStore / Sideloadly / Xcode (`.ipa`) | [CipherGen_1.1.0_iOS-unsigned.ipa](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/CipherGen_1.1.0_iOS-unsigned.ipa) |
+| **Windows (x64)** | Instalador NSIS (`.exe`) | [CipherGen_1.1.0_x64-setup.exe](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/CipherGen_1.1.0_x64-setup.exe) |
+| **Linux (Debian/Ubuntu)** | Paquete `.deb` | [CipherGen_1.1.0_amd64.deb](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/CipherGen_1.1.0_amd64.deb) |
+| **Linux (Universal)** | Portable `.AppImage` | [CipherGen_1.1.0_amd64.AppImage](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/CipherGen_1.1.0_amd64.AppImage) |
+| **Verificación** | Sumas SHA-256 | [SHA256SUMS.txt](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/SHA256SUMS.txt) |
+
+---
+
+## Novedades Principales en v1.1.0
+
+1. **Bóveda Determinista Argon2id (Stateless)**:
+   - Derivación determinista con **Argon2id v19 (`64 MiB`, `t=3`, `p=1`)** + DRBG SHA-256 sin sesgo.
+   - Regenera exactamente la misma contraseña única en Windows, Linux, Android e iOS sin guardar ninguna base de datos en disco.
+   - Incluye **Huella Visual Anti-Errores (Master Fingerprint)** para detectar instantáneamente errores de tipeo en la contraseña maestra, y **contador de versión (`v1`, `v2`, ...)** para rotación inmediata.
+2. **Transferencia por Código QR 100% Offline**:
+   - Generación SVG instantánea en local con marco de alto contraste, texto ocultable y cero dependencias de red.
+3. **Deletreo Fonético NATO**:
+   - Desglose carácter por carácter con códigos de color (`MAYÚS`, `minús`, `NÚM`, `SÍMB`) y copia de deletreo en 1 clic para dictado o transcripción en dispositivos aislados.
+4. **Diceware Bilingüe ES / EN**:
+   - **Español (8,192 palabras ASCII limpias • `13.0` bits exactos/palabra)** y **English EFF Large Wordlist (7,776 palabras • `12.92` bits/palabra)** embebidos 100% offline.
+5. **BIP-39 / Base64URL / UUID v4 / Códigos de Recuperación 2FA**:
+   - **Semillas BIP-39** (12 / 15 / 18 / 21 / 24 palabras en **EN** y **ES**) con suma de verificación **SHA-256** exacta y visualización numerada.
+   - **Tokens Base64URL** (RFC 4648 §5, 128–512 bits, sin relleno `=`) para JWT, OAuth PKCE y APIs.
+   - **UUID v4** (RFC 9562, 122 bits CSPRNG) con/sin guiones y mayúsculas opcionales.
+   - **Códigos de recuperación 2FA** (`4×2`, `5×2`, `4×4`, kit de 8 códigos) con alfabeto sin caracteres ambiguos (`0`, `O`, `1`, `I`, `L`).
+6. **Exclusión Personalizada de Caracteres**:
+   - Campo libre + filtros rápidos de 1 clic (`Comillas "'`, `Barras /\`, `HTML <>&`, `Shell $;|`) disponible tanto en el generador principal como en la Bóveda Argon2id.
+7. **Historial Efímero en RAM**:
+   - Últimos 20 secretos de la sesión únicamente en memoria volátil (enmascarados por defecto, con revelar/copiar/QR/NATO, pausable y destruido automáticamente al cerrar, bloquear o pulsar `Esc`).
+8. **Auto-Bloqueo al Minimizar**:
+   - Limpia secretos en pantalla, historial RAM, bóveda y portapapeles al minimizar o cambiar de aplicación (`Inmediato 0s`, `15s`, `30s`, `60s` o `OFF`).
+9. **Analizador con Entropía Real Penalizada**:
+   - Compara entropía teórica vs. **entropía real penalizada**, detectando diccionarios ES/EN (con leetspeak), patrones de teclado QWERTY, secuencias alfanuméricas, fechas/años, repeticiones, baja entropía de Shannon y reglas humanas (`Palabra + 2025 + !`).
 
 ---
 
 ## Arquitectura y Garantías de Seguridad
 
-### 1. Núcleo Criptográfico en Rust Puro (`crates/ciphergen-core`)
-- **`#![forbid(unsafe_code)]`** en todo el núcleo (`ciphergen-core`) y el shell Tauri (`src-tauri`).
-- **CSPRNG exclusivo del sistema operativo** (`rand_core::OsRng` / `getrandom`):
-  - Windows: `BCryptGenRandom`
-  - Linux / Android: `getrandom(2)`
-  - iOS / macOS: `SecRandomCopyBytes`
-- **Muestreo por rechazo sin sesgo módulo (`%`)**:
-  Implementación exacta del algoritmo `arc4random_uniform` sobre `u64`:
-  `threshold = bound.wrapping_neg() % bound`; se descartan todas las muestras `< threshold` antes de reducir módulo `bound`, eliminando por completo cualquier sesgo estadístico.
-- **Limpieza de memoria (`zeroize`)**: los buffers binarios e intermedios sensibles se sobrescriben con ceros inmediatamente después de su codificación.
-
-### 2. Modos de Generación
-- **Contraseñas aleatorias de alta entropía**:
-  - Longitud `8–128` caracteres.
-  - Toggles independientes: mayúsculas, minúsculas, números, símbolos seguros (`!@#$%^&*-_=+?`), símbolos extendidos y exclusión de caracteres ambiguos (`0O1lI|`).
-  - Garantía de al menos **1 carácter de cada conjunto activo** + mezcla **Fisher-Yates** usando el CSPRNG por rechazo.
-- **Frases de paso Diceware EFF**:
-  - Lista oficial **EFF Large Wordlist (7,776 palabras)** embebida localmente offline (`include_str!`).
-  - `4–12` palabras, separador personalizable, capitalización (`Título`, `minúsculas`, `MAYÚSCULAS`, `1 palabra aleatoria`) y dígito aleatorio opcional.
-- **PINs y Llaves Criptográficas**:
-  - PINs numéricos criptográficamente uniformes (`4–16` dígitos).
-  - Llaves **Hex** y **Base32 (RFC 4648)** exactas de **128 bits** y **256 bits** con agrupación opcional de 4 caracteres.
-
-### 3. Análisis Criptográfico Local en Tiempo Real
-- Entropía exacta en bits según el alfabeto efectivo.
-- Estimación de tiempo medio de descifrado ($2^{H-1}$ intentos):
-  - **Ataque online con rate-limit** (`100 intentos/hora`).
-  - **Clúster moderno de GPUs en hash rápido** (`100 GH/s` — SHA-256 / NTLM).
-  - **Clúster moderno de GPUs contra Argon2id** (`10 kH/s` — KDF memory-hard).
-- **Análisis honesto frente al Algoritmo de Grover cuántico**: divide la entropía efectiva a la mitad ($H / 2$) e indica claramente cuándo se alcanza el umbral **Post-Cuántico ($\ge 256$ bits clásicos / $\ge 128$ bits efectivos)**.
-
-### 4. Higiene de Privacidad
-- **CSP estricta** (`connect-src 'none'`, cero fuentes o scripts externos, cero telemetría).
-- **Cero historial persistente en disco**: todo vive únicamente en RAM volátil.
-- **Auto-limpieza de portapapeles** configurable (`15s` / `30s` / `60s`) con barra de cuenta regresiva y limpieza inmediata manual.
-- **Generación por lote** (`1` a `10` elementos) y 4 temas oscuros estilo **Obsidian / Neon Cyber**.
+- **`#![forbid(unsafe_code)]`** en todo el núcleo (`crates/ciphergen-core`) y el shell Tauri (`src-tauri`).
+- **CSPRNG exclusivo del sistema operativo** (`rand_core::OsRng` / `getrandom`: `BCryptGenRandom`, `getrandom(2)`, `SecRandomCopyBytes`).
+- **Muestreo por rechazo sin sesgo módulo** (`arc4random_uniform` sobre `u64`) + mezcla **Fisher-Yates**.
+- **Limpieza de memoria (`zeroize`)** sobre claves derivadas, buffers binarios y estado DRBG.
+- **CSP estricta** (`connect-src 'none'`), cero telemetría, cero historial persistente en disco, 6 temas (4 oscuros + 2 claros) y bloqueo biométrico nativo en Android/iOS.
 
 ---
 
 ## Desarrollo Local y Pruebas
 
-### Requisitos
-- Rust stable (`rustc` + `cargo`)
-- Node.js 22+ (`npm`)
-- Dependencias de plataforma de Tauri 2 para compilar ejecutables nativos.
-
-### Ejecutar pruebas
 ```bash
-# Pruebas unitarias en Rust (sesgo Chi-cuadrado, Fisher-Yates, entropía, EFF 7776, políticas)
+# Pruebas unitarias en Rust (Argon2id, BIP-39 vectores oficiales, Chi-cuadrado, Diceware ES/EN, entropía penalizada)
 cargo test -p ciphergen-core
 
-# Pruebas unitarias en Vitest (entropía, Grover, auto-limpieza de portapapeles, políticas)
+# Pruebas unitarias en Vitest
 npm ci
 npm test
 
 # Compilación de verificación del frontend
 npm run build
 ```
-
-### Ejecutar en modo desarrollo (Tauri Desktop)
-```bash
-npm run tauri dev
-```
-
----
-
-## CI/CD Multiplataforma (GitHub Actions)
-
-El workflow [`.github/workflows/build-release.yml`](.github/workflows/build-release.yml) ejecuta automáticamente las pruebas en Rust y Vitest y genera los artefactos descargables:
-- **Windows**: instalador NSIS (`.exe`)
-- **Linux**: paquetes `.deb` y `.AppImage`
-- **Android**: paquete `.apk`
-- **iOS**: paquete `.ipa` sin firmar (para firma personal con AltStore / Sideloadly / Xcode)
-
-Al crear un tag `v*` (por ejemplo `v1.0.0`), todos los binarios se publican automáticamente en GitHub Releases.
 
 ---
 

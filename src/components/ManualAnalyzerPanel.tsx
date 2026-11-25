@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Eye, EyeOff, Trash2, ShieldAlert, CheckCircle2 } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Trash2,
+  ShieldAlert,
+  CheckCircle2,
+  FlaskConical,
+} from "lucide-react";
 import type { SecurityAnalysis } from "../types/ciphergen";
 import { SecurityAnalysisPanel } from "./SecurityAnalysisPanel";
 
@@ -8,6 +15,12 @@ interface ManualAnalyzerPanelProps {
   onSecretChange: (val: string) => void;
   analysis: SecurityAnalysis | null;
 }
+
+const DEMO_SAMPLES = [
+  { label: "Común (P@ssw0rd2025!)", value: "P@ssw0rd2025!" },
+  { label: "Teclado (Qwerty12345!)", value: "Qwerty12345!" },
+  { label: "Repetida (aaabbb111222)", value: "aaabbb111222" },
+];
 
 export function ManualAnalyzerPanel({
   secret,
@@ -29,11 +42,11 @@ export function ManualAnalyzerPanel({
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-sm font-bold tracking-tight text-slate-100 sm:text-base">
-              Analizador Manual de Contraseñas (100% Local)
+              Analizador con Entropía Real Penalizada (100% Local)
             </h2>
             <p className="text-xs text-slate-400">
-              Escribe o pega cualquier contraseña para evaluar su entropía real,
-              resistencia GPU/Argon2id y margen cuántico Grover.
+              Detecta palabras de diccionario (ES/EN + leetspeak), secuencias QWERTY,
+              fechas, repeticiones y reglas humanas — reduciendo la entropía real de forma honesta.
             </p>
           </div>
         </div>
@@ -43,7 +56,7 @@ export function ManualAnalyzerPanel({
             type={visible ? "text" : "password"}
             value={secret}
             onChange={(e) => onSecretChange(e.target.value)}
-            placeholder="Escribe una contraseña aquí para analizarla en tiempo real..."
+            placeholder="Escribe una contraseña aquí para auditar su entropía real..."
             autoComplete="off"
             autoCorrect="off"
             autoCapitalize="off"
@@ -70,6 +83,24 @@ export function ManualAnalyzerPanel({
               </button>
             )}
           </div>
+        </div>
+
+        {/* Quick test examples */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 text-[10px] text-slate-500">
+            <FlaskConical className="h-3 w-3" />
+            Probar penalizaciones:
+          </span>
+          {DEMO_SAMPLES.map((s) => (
+            <button
+              key={s.label}
+              type="button"
+              onClick={() => onSecretChange(s.value)}
+              className="cyber-elevated rounded-md px-2 py-0.5 text-[10px] text-slate-300 transition hover:border-cyan-400/50 hover:text-white"
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
 
         {/* Character composition pills */}
@@ -107,8 +138,8 @@ export function ManualAnalyzerPanel({
         </div>
 
         <p className="mt-3 text-[11px] text-slate-500">
-          Privacidad garantizada: el texto nunca sale de la memoria RAM de tu
-          dispositivo ni se envía a ningún servidor.
+          Privacidad garantizada: el análisis ocurre 100% en memoria RAM offline sin
+          enviar ningún carácter fuera de tu dispositivo.
         </p>
       </section>
 
@@ -122,8 +153,8 @@ export function ManualAnalyzerPanel({
         />
       ) : (
         <div className="cyber-panel rounded-2xl p-6 text-center text-xs text-slate-400">
-          Empieza a escribir una contraseña arriba para ver su entropía exacta,
-          tiempo estimado de descifrado y margen frente al algoritmo de Grover.
+          Empieza a escribir una contraseña arriba (o prueba uno de los ejemplos) para ver
+          su entropía teórica vs. entropía real penalizada, tiempo de descifrado y margen cuántico.
         </div>
       )}
     </div>

@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
-import { Fingerprint, ArrowRight, WifiOff, ShieldCheck, Lock } from "lucide-react";
+import {
+  Fingerprint,
+  ArrowRight,
+  WifiOff,
+  ShieldCheck,
+  Lock,
+  Vault,
+} from "lucide-react";
 
 interface SplashScreenProps {
   biometricAvailable: boolean;
   biometricLabel: string;
   biometricLockEnabled: boolean;
+  autoLockedReason?: boolean;
   onUnlockBiometric: () => Promise<{ success: boolean; error?: string }>;
   onEnter: () => void;
   onToggleBiometricLock: (enabled: boolean) => void;
@@ -14,6 +22,7 @@ export function SplashScreen({
   biometricAvailable,
   biometricLabel,
   biometricLockEnabled,
+  autoLockedReason = false,
   onUnlockBiometric,
   onEnter,
   onToggleBiometricLock,
@@ -62,9 +71,15 @@ export function SplashScreen({
           Cipher<span style={{ color: "var(--accent)" }}>GenX</span>
         </h1>
         <p className="mt-2 text-xs leading-relaxed text-slate-400 sm:text-sm">
-          Generador criptográfico CSPRNG y analizador de entropía post-cuántica.
-          100% offline y sin rastros en disco.
+          Suite criptográfica CSPRNG, Bóveda Argon2id stateless, BIP-39, Diceware
+          ES/EN y analizador de entropía real. 100% offline.
         </p>
+
+        {autoLockedReason && (
+          <div className="mt-4 w-full rounded-xl border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+            Sesión auto-bloqueada al minimizar: memoria RAM y portapapeles limpiados.
+          </div>
+        )}
 
         {/* Security badges */}
         <div className="mt-5 flex flex-wrap items-center justify-center gap-2 text-[11px] text-slate-300">
@@ -77,8 +92,12 @@ export function SplashScreen({
             Rust CSPRNG
           </span>
           <span className="cyber-elevated inline-flex items-center gap-1 rounded-full px-2.5 py-1">
+            <Vault className="h-3 w-3 text-purple-400" />
+            Argon2id
+          </span>
+          <span className="cyber-elevated inline-flex items-center gap-1 rounded-full px-2.5 py-1">
             <Lock className="h-3 w-3 text-amber-400" />
-            Sin Historial
+            Solo RAM
           </span>
         </div>
 
@@ -130,7 +149,7 @@ export function SplashScreen({
         </div>
 
         <p className="mt-6 text-[10px] text-slate-500">
-          v1.0.1 • All Rights Reserved — Private Personal Use
+          v1.1.0 • All Rights Reserved — Private Personal Use
         </p>
       </div>
     </div>

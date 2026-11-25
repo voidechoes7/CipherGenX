@@ -7,6 +7,7 @@ import {
   Shield,
   Sparkles,
   Search,
+  AlertTriangle,
 } from "lucide-react";
 import type { SecurityAnalysis, SecurityLevel } from "../types/ciphergen";
 
@@ -62,6 +63,11 @@ export function SecurityAnalysisPanel({
       ? customAnalysis
       : analysis;
   const styles = LEVEL_STYLES[active.level];
+  const hasPenalties = active.penalties && active.penalties.length > 0;
+  const lostBits = Math.max(
+    0,
+    (active.theoreticalEntropyBits ?? active.entropyBits) - active.entropyBits
+  );
 
   return (
     <section className="cyber-panel space-y-4 rounded-2xl p-4 sm:p-5">
@@ -108,14 +114,23 @@ export function SecurityAnalysisPanel({
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              Entropía Real Exacta
+              {hasPenalties
+                ? "Entropía Real Penalizada"
+                : "Entropía Real Exacta"}
             </div>
-            <div className="mt-0.5 flex items-baseline gap-2">
+            <div className="mt-0.5 flex flex-wrap items-baseline gap-2">
               <span className={`font-mono text-2xl font-extrabold ${styles.text}`}>
                 {active.entropyBits.toFixed(1)}
               </span>
               <span className="text-xs text-slate-400">
-                bits • Alfabeto efectivo:{" "}
+                bits
+                {hasPenalties && lostBits > 0.5 && (
+                  <span className="ml-1.5 rounded bg-rose-500/15 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-rose-300">
+                    teórica: {active.theoreticalEntropyBits.toFixed(1)} (−
+                    {lostBits.toFixed(1)}b)
+                  </span>
+                )}
+                {" • "}Alfabeto efectivo:{" "}
                 <strong className="font-mono text-slate-200">
                   {active.alphabetSize.toLocaleString("es-ES")}
                 </strong>
@@ -145,6 +160,41 @@ export function SecurityAnalysisPanel({
           <span>Post-Cuántica (≥256)</span>
         </div>
       </div>
+
+      {/* Penalties breakdown (when custom password has detectable weaknesses) */}
+      {hasPenalties && (
+        <div className="rounded-xl border border-rose-500/35 bg-rose-950/20 p-3.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-rose-300">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>
+                Patrones y Penalizaciones Detectadas ({active.penalties.length})
+              </span>
+            </div>
+            <span className="font-mono text-[11px] font-bold text-rose-300">
+              −{lostBits.toFixed(1)} bits reales
+            </span>
+          </div>
+          <div className="space-y-2">
+            {active.penalties.map((p, i) => (
+              <div
+                key={`${p.code}-${i}`}
+                className="rounded-lg border border-rose-500/20 bg-black/20 px-3 py-2 text-xs"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-rose-200">{p.label}</span>
+                  <span className="rounded bg-rose-500/20 px-1.5 py-0.5 font-mono text-[10px] font-bold text-rose-300">
+                    −{p.bitsLost.toFixed(1)} bits
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-slate-300">
+                  {p.detail}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Crack time estimates */}
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">

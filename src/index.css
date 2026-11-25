@@ -162,8 +162,15 @@ body {
 }
 
 [data-theme="ios-light"] .text-rose-300,
-[data-theme="cyber-light"] .text-rose-300 {
+[data-theme="cyber-light"] .text-rose-300,
+[data-theme="ios-light"] .text-rose-200,
+[data-theme="cyber-light"] .text-rose-200 {
   color: #be123c;
+}
+
+[data-theme="ios-light"] .text-purple-300,
+[data-theme="cyber-light"] .text-purple-300 {
+  color: #7e22ce;
 }
 
 [data-theme="ios-light"] .text-sky-300,
@@ -175,9 +182,25 @@ body {
 [data-theme="cyber-light"] .bg-slate-900,
 [data-theme="ios-light"] .bg-slate-900\/70,
 [data-theme="cyber-light"] .bg-slate-900\/70,
+[data-theme="ios-light"] .bg-slate-900\/60,
+[data-theme="cyber-light"] .bg-slate-900\/60,
 [data-theme="ios-light"] .bg-slate-900\/40,
-[data-theme="cyber-light"] .bg-slate-900\/40 {
+[data-theme="cyber-light"] .bg-slate-900\/40,
+[data-theme="ios-light"] .bg-slate-950\/40,
+[data-theme="cyber-light"] .bg-slate-950\/40 {
   background-color: #e2e8f0;
+}
+
+[data-theme="ios-light"] .bg-rose-950\/20,
+[data-theme="cyber-light"] .bg-rose-950\/20,
+[data-theme="ios-light"] .bg-rose-950\/30,
+[data-theme="cyber-light"] .bg-rose-950\/30 {
+  background-color: rgba(244, 63, 94, 0.08);
+}
+
+[data-theme="ios-light"] .bg-black\/20,
+[data-theme="cyber-light"] .bg-black\/20 {
+  background-color: rgba(255, 255, 255, 0.72);
 }
 
 [data-theme="ios-light"] .bg-slate-800,
@@ -190,7 +213,11 @@ body {
 [data-theme="ios-light"] .border-slate-800\/80,
 [data-theme="cyber-light"] .border-slate-800\/80,
 [data-theme="ios-light"] .border-slate-700\/80,
-[data-theme="cyber-light"] .border-slate-700\/80 {
+[data-theme="cyber-light"] .border-slate-700\/80,
+[data-theme="ios-light"] .border-slate-700\/70,
+[data-theme="cyber-light"] .border-slate-700\/70,
+[data-theme="ios-light"] .border-slate-700\/60,
+[data-theme="cyber-light"] .border-slate-700\/60 {
   border-color: rgba(15, 23, 42, 0.14);
 }
 

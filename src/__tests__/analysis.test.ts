@@ -6,7 +6,7 @@ import {
   securityLevelFromEntropy,
 } from "../lib/tauriBridge";
 
-describe("Entropy, Crack Time & Quantum Grover Analysis", () => {
+describe("Entropy, Penalized Real Entropy, Crack Time & Quantum Grover Analysis", () => {
   it("classifies security levels across all 5 tiers including Post-Quantum >= 256 bits", () => {
     expect(securityLevelFromEntropy(32).level).toBe("weak");
     expect(securityLevelFromEntropy(64).level).toBe("fair");
@@ -33,13 +33,25 @@ describe("Entropy, Crack Time & Quantum Grover Analysis", () => {
     expect(formatDurationFromLog10Seconds(40)).toContain("edad del universo");
   });
 
-  it("analyzes custom secrets locally based on effective alphabet", () => {
-    const weak = analyzeCustomSecretFallback("123456");
-    expect(weak.level).toBe("weak");
-    expect(weak.alphabetSize).toBe(10);
+  it("penalizes common words, leetspeak, keyboard walks, and repetitions honestly", () => {
+    const leaked = analyzeCustomSecretFallback("P@ssw0rd2025!");
+    expect(leaked.theoreticalEntropyBits).toBeGreaterThan(75);
+    expect(leaked.entropyBits).toBeLessThan(35);
+    expect(leaked.level).toBe("weak");
+    expect(leaked.penalties.length).toBeGreaterThan(0);
+
+    const repeated = analyzeCustomSecretFallback("aaaaaaaaaaaa");
+    expect(repeated.entropyBits).toBeLessThan(15);
+    expect(repeated.level).toBe("weak");
+
+    const qwerty = analyzeCustomSecretFallback("qwertyuiop1234");
+    expect(qwerty.entropyBits).toBeLessThan(25);
+    expect(qwerty.penalties.some((p) => p.code === "keyboard_walk")).toBe(true);
 
     const strong = analyzeCustomSecretFallback("K9$mP2!xQ7@vL4#nR8&zW1^t");
     expect(strong.alphabetSize).toBe(94);
+    expect(strong.penalties).toHaveLength(0);
+    expect(strong.entropyBits).toBe(strong.theoreticalEntropyBits);
     expect(strong.entropyBits).toBeGreaterThan(150);
     expect(strong.level).toBe("ultraStrong");
   });

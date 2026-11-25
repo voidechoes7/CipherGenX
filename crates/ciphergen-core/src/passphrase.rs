@@ -1,4 +1,5 @@
-//! Offline Diceware passphrase generator backed by the official 7,776-word EFF Large Wordlist.
+//! Offline Diceware passphrase generator supporting Spanish (8,192 words, 13.0 bits/word)
+//! and official English EFF Large Wordlist (7,776 words, 12.92 bits/word).
 
 use std::sync::OnceLock;
 
@@ -12,14 +13,17 @@ use crate::{CipherError, GeneratedItem, GenerationMode};
 pub const MIN_WORD_COUNT: usize = 4;
 pub const MAX_WORD_COUNT: usize = 12;
 pub const EFF_WORDLIST_SIZE: usize = 7_776;
+pub const ES_WORDLIST_SIZE: usize = 8_192;
 
 const RAW_EFF_WORDLIST: &str = include_str!("../assets/eff_large_wordlist.txt");
+const RAW_ES_WORDLIST: &str = include_str!("../assets/diceware_es_8192.txt");
 
-static WORDLIST: OnceLock<Vec<&'static str>> = OnceLock::new();
+static EFF_WORDS: OnceLock<Vec<&'static str>> = OnceLock::new();
+static ES_WORDS: OnceLock<Vec<&'static str>> = OnceLock::new();
 
-/// Return the parsed 7,776-word EFF Large Wordlist embedded offline in the binary.
+/// Return the parsed 7,776-word EFF Large Wordlist (English) embedded offline in the binary.
 pub fn eff_wordlist() -> &'static [&'static str] {
-    WORDLIST
+    EFF_WORDS
         .get_or_init(|| {
             RAW_EFF_WORDLIST
                 .lines()
@@ -33,6 +37,32 @@ pub fn eff_wordlist() -> &'static [&'static str] {
                 .collect()
         })
         .as_slice()
+}
+
+/// Return the parsed 8,192-word ASCII-clean Spanish Diceware wordlist embedded offline in the binary.
+pub fn es_wordlist() -> &'static [&'static str] {
+    ES_WORDS
+        .get_or_init(|| {
+            RAW_ES_WORDLIST
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty())
+                .collect()
+        })
+        .as_slice()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WordlistLanguage {
+    En,
+    Es,
+}
+
+impl Default for WordlistLanguage {
+    fn default() -> Self {
+        Self::Es
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -57,6 +87,8 @@ pub struct PassphraseConfig {
     pub separator: String,
     pub capitalization: Capitalization,
     pub include_number: bool,
+    #[serde(default)]
+    pub language: WordlistLanguage,
     pub count: usize,
 }
 
@@ -67,6 +99,7 @@ impl Default for PassphraseConfig {
             separator: "-".to_string(),
             capitalization: Capitalization::Title,
             include_number: true,
+            language: WordlistLanguage::Es,
             count: 1,
         }
     }
@@ -109,7 +142,7 @@ pub fn passphrase_entropy_bits(config: &PassphraseConfig, wordlist_size: usize) 
     base + number_bonus + cap_bonus
 }
 
-/// Generate a batch of offline EFF Diceware passphrases using unbiased CSPRNG sampling.
+/// Generate a batch of offline Diceware passphrases (ES 8,192 or EN EFF 7,776) using unbiased CSPRNG sampling.
 pub fn generate_passphrases<R: Csprng>(
     rng: &mut R,
     config: &PassphraseConfig,
@@ -130,10 +163,14 @@ pub fn generate_passphrases<R: Csprng>(
         ));
     }
 
-    let words = eff_wordlist();
-    if words.len() != EFF_WORDLIST_SIZE {
+    let (words, expected_size, label) = match config.language {
+        WordlistLanguage::En => (eff_wordlist(), EFF_WORDLIST_SIZE, "EFF EN"),
+        WordlistLanguage::Es => (es_wordlist(), ES_WORDLIST_SIZE, "Diceware ES"),
+    };
+
+    if words.len() != expected_size {
         return Err(CipherError::Internal(format!(
-            "Lista EFF corrupta: se esperaban {EFF_WORDLIST_SIZE} palabras, se encontraron {}.",
+            "Lista {label} corrupta: se esperaban {expected_size} palabras, se encontraron {}.",
             words.len()
         )));
     }

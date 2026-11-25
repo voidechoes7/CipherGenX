@@ -1,4 +1,4 @@
-import { Lock, HardDrive, ShieldAlert } from "lucide-react";
+import { Lock, HardDrive, ShieldAlert, Keyboard } from "lucide-react";
 
 export function PrivacyFooter() {
   return (
@@ -10,15 +10,19 @@ export function PrivacyFooter() {
         </span>
         <span className="inline-flex items-center gap-1.5">
           <HardDrive className="h-3.5 w-3.5 text-cyan-500" />
-          Cero historial persistente en disco
+          Historial solo en RAM volátil
         </span>
         <span className="inline-flex items-center gap-1.5">
           <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />
-          Muestreo por rechazo sin sesgo módulo
+          Argon2id stateless + CSPRNG sin sesgo
+        </span>
+        <span className="hidden items-center gap-1.5 lg:inline-flex">
+          <Keyboard className="h-3.5 w-3.5 text-slate-400" />
+          Ctrl+G Regenerar • Ctrl+Shift+C Copiar • Esc Limpiar RAM
         </span>
       </div>
       <div className="text-slate-500">
-        © 2026 CipherGenX — All Rights Reserved (Private Personal Use)
+        © 2026 CipherGenX v1.1.0 — Private Personal Use
       </div>
     </footer>
   );

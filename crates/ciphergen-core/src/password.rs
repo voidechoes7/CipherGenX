@@ -1,4 +1,4 @@
-//! High-entropy random password generator with policy guarantees and zero bias.
+//! High-entropy random password generator with policy guarantees, custom exclusions, and zero bias.
 
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
@@ -29,6 +29,8 @@ pub struct PasswordConfig {
     pub safe_symbols: bool,
     pub extended_symbols: bool,
     pub exclude_ambiguous: bool,
+    #[serde(default)]
+    pub custom_exclude: String,
     pub count: usize,
 }
 
@@ -42,6 +44,7 @@ impl Default for PasswordConfig {
             safe_symbols: true,
             extended_symbols: false,
             exclude_ambiguous: true,
+            custom_exclude: String::new(),
             count: 1,
         }
     }
@@ -55,15 +58,19 @@ pub struct PasswordBatchResult {
     pub analysis: SecurityAnalysis,
 }
 
-fn filter_chars(source: &str, exclude_ambiguous: bool) -> Vec<char> {
+fn filter_chars(source: &str, exclude_ambiguous: bool, custom_exclude: &str) -> Vec<char> {
     source
         .chars()
-        .filter(|c| !exclude_ambiguous || !AMBIGUOUS_CHARS.contains(*c))
+        .filter(|c| {
+            (!exclude_ambiguous || !AMBIGUOUS_CHARS.contains(*c)) && !custom_exclude.contains(*c)
+        })
         .collect()
 }
 
 /// Build the active character sets and combined deduplicated alphabet.
-pub fn build_active_sets(config: &PasswordConfig) -> Result<(Vec<Vec<char>>, Vec<char>), CipherError> {
+pub fn build_active_sets(
+    config: &PasswordConfig,
+) -> Result<(Vec<Vec<char>>, Vec<char>), CipherError> {
     if !(MIN_PASSWORD_LENGTH..=MAX_PASSWORD_LENGTH).contains(&config.length) {
         return Err(CipherError::InvalidConfig(format!(
             "La longitud debe estar entre {MIN_PASSWORD_LENGTH} y {MAX_PASSWORD_LENGTH} caracteres."
@@ -78,31 +85,51 @@ pub fn build_active_sets(config: &PasswordConfig) -> Result<(Vec<Vec<char>>, Vec
     let mut active_sets: Vec<Vec<char>> = Vec::with_capacity(5);
 
     if config.uppercase {
-        let s = filter_chars(UPPERCASE_CHARS, config.exclude_ambiguous);
+        let s = filter_chars(
+            UPPERCASE_CHARS,
+            config.exclude_ambiguous,
+            &config.custom_exclude,
+        );
         if !s.is_empty() {
             active_sets.push(s);
         }
     }
     if config.lowercase {
-        let s = filter_chars(LOWERCASE_CHARS, config.exclude_ambiguous);
+        let s = filter_chars(
+            LOWERCASE_CHARS,
+            config.exclude_ambiguous,
+            &config.custom_exclude,
+        );
         if !s.is_empty() {
             active_sets.push(s);
         }
     }
     if config.numbers {
-        let s = filter_chars(DIGIT_CHARS, config.exclude_ambiguous);
+        let s = filter_chars(
+            DIGIT_CHARS,
+            config.exclude_ambiguous,
+            &config.custom_exclude,
+        );
         if !s.is_empty() {
             active_sets.push(s);
         }
     }
     if config.safe_symbols {
-        let s = filter_chars(SAFE_SYMBOL_CHARS, config.exclude_ambiguous);
+        let s = filter_chars(
+            SAFE_SYMBOL_CHARS,
+            config.exclude_ambiguous,
+            &config.custom_exclude,
+        );
         if !s.is_empty() {
             active_sets.push(s);
         }
     }
     if config.extended_symbols {
-        let s = filter_chars(EXTENDED_SYMBOL_CHARS, config.exclude_ambiguous);
+        let s = filter_chars(
+            EXTENDED_SYMBOL_CHARS,
+            config.exclude_ambiguous,
+            &config.custom_exclude,
+        );
         if !s.is_empty() {
             active_sets.push(s);
         }
@@ -110,7 +137,8 @@ pub fn build_active_sets(config: &PasswordConfig) -> Result<(Vec<Vec<char>>, Vec
 
     if active_sets.is_empty() {
         return Err(CipherError::InvalidConfig(
-            "Debes activar al menos un conjunto de caracteres.".to_string(),
+            "No quedan caracteres disponibles: activa al menos un conjunto o reduce las exclusiones personalizadas."
+                .to_string(),
         ));
     }
 
@@ -127,6 +155,12 @@ pub fn build_active_sets(config: &PasswordConfig) -> Result<(Vec<Vec<char>>, Vec
                 combined.push(ch);
             }
         }
+    }
+
+    if combined.len() < 2 {
+        return Err(CipherError::InvalidConfig(
+            "El alfabeto efectivo debe contener al menos 2 caracteres distintos.".to_string(),
+        ));
     }
 
     Ok((active_sets, combined))

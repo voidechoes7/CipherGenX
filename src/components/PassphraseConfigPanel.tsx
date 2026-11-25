@@ -1,9 +1,34 @@
-import type { Capitalization, PassphraseConfig } from "../types/ciphergen";
+import { Languages } from "lucide-react";
+import type {
+  Capitalization,
+  PassphraseConfig,
+  WordlistLanguage,
+} from "../types/ciphergen";
 
 interface PassphraseConfigPanelProps {
   config: PassphraseConfig;
   onChange: (next: PassphraseConfig) => void;
 }
+
+const LANGUAGES: {
+  id: WordlistLanguage;
+  label: string;
+  meta: string;
+  bitsPerWord: number;
+}[] = [
+  {
+    id: "es",
+    label: "Español (ES)",
+    meta: "8,192 pal. • 13.0 bits/pal.",
+    bitsPerWord: 13.0,
+  },
+  {
+    id: "en",
+    label: "English (EFF)",
+    meta: "7,776 pal. • 12.9 bits/pal.",
+    bitsPerWord: 12.925,
+  },
+];
 
 const SEPARATORS = [
   { label: "Guion (-)", value: "-" },
@@ -24,8 +49,48 @@ export function PassphraseConfigPanel({
   config,
   onChange,
 }: PassphraseConfigPanelProps) {
+  const langInfo =
+    LANGUAGES.find((l) => l.id === config.language) ?? LANGUAGES[0];
+  const bpw = langInfo.bitsPerWord;
+
   return (
     <div className="space-y-5">
+      {/* Language selector ES / EN */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <Languages className="h-3.5 w-3.5" style={{ color: "var(--accent)" }} />
+          <span>Diccionario Offline Diceware</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {LANGUAGES.map((lang) => {
+            const active = config.language === lang.id;
+            return (
+              <button
+                key={lang.id}
+                type="button"
+                onClick={() => onChange({ ...config, language: lang.id })}
+                className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                  active
+                    ? "text-white"
+                    : "border-slate-800 text-slate-400 hover:border-slate-700"
+                }`}
+                style={
+                  active
+                    ? {
+                        background: "var(--accent-glow)",
+                        borderColor: "var(--border-accent)",
+                      }
+                    : undefined
+                }
+              >
+                <div className="text-xs font-bold sm:text-sm">{lang.label}</div>
+                <div className="text-[11px] text-slate-400">{lang.meta}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Word count slider */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between">
@@ -33,7 +98,7 @@ export function PassphraseConfigPanel({
             htmlFor="pp-words"
             className="text-xs font-semibold uppercase tracking-wider text-slate-400"
           >
-            Número de palabras (EFF 7,776)
+            Número de palabras
           </label>
           <span
             className="min-w-[3.5rem] rounded-lg px-2.5 py-1 text-center font-mono text-sm font-bold"
@@ -58,10 +123,10 @@ export function PassphraseConfigPanel({
           className="cyber-slider w-full"
         />
         <div className="flex justify-between text-[11px] text-slate-500">
-          <span>4 (~51.7 bits)</span>
-          <span>6 (~77.5 bits)</span>
-          <span>10 (~129.2 bits)</span>
-          <span>12 (~155.1 bits)</span>
+          <span>4 (~{(4 * bpw).toFixed(0)} bits)</span>
+          <span>6 (~{(6 * bpw).toFixed(0)} bits)</span>
+          <span>10 (~{(10 * bpw).toFixed(0)} bits)</span>
+          <span>12 (~{(12 * bpw).toFixed(0)} bits)</span>
         </div>
       </div>
 
@@ -175,7 +240,9 @@ export function PassphraseConfigPanel({
             </div>
             <div
               className={`flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors ${
-                config.includeNumber ? "justify-end" : "justify-start bg-slate-800"
+                config.includeNumber
+                  ? "justify-end"
+                  : "justify-start bg-slate-800"
               }`}
               style={
                 config.includeNumber

@@ -1,4 +1,10 @@
-import { KeyRound, BookOpenText, Binary, ShieldCheck } from "lucide-react";
+import {
+  KeyRound,
+  BookOpenText,
+  Binary,
+  Vault,
+  ShieldCheck,
+} from "lucide-react";
 import type { ActiveTab } from "../types/ciphergen";
 
 interface ModeTabsProps {
@@ -6,7 +12,12 @@ interface ModeTabsProps {
   onChange: (tab: ActiveTab) => void;
 }
 
-const TABS: { id: ActiveTab; label: string; sub: string; icon: typeof KeyRound }[] = [
+const TABS: {
+  id: ActiveTab;
+  label: string;
+  sub: string;
+  icon: typeof KeyRound;
+}[] = [
   {
     id: "password",
     label: "Contraseñas",
@@ -15,20 +26,26 @@ const TABS: { id: ActiveTab; label: string; sub: string; icon: typeof KeyRound }
   },
   {
     id: "passphrase",
-    label: "Diceware EFF",
-    sub: "7,776 palabras",
+    label: "Diceware ES/EN",
+    sub: "8,192 ES • 7,776 EFF",
     icon: BookOpenText,
   },
   {
     id: "keys",
-    label: "PIN y Llaves",
-    sub: "PIN • Hex • Base32",
+    label: "Llaves & Tokens",
+    sub: "BIP-39 • UUID • 2FA",
     icon: Binary,
+  },
+  {
+    id: "vault",
+    label: "Bóveda Argon2id",
+    sub: "Stateless determinista",
+    icon: Vault,
   },
   {
     id: "analyzer",
     label: "Analizador",
-    sub: "Evaluar clave manual",
+    sub: "Entropía real penalizada",
     icon: ShieldCheck,
   },
 ];
@@ -36,7 +53,7 @@ const TABS: { id: ActiveTab; label: string; sub: string; icon: typeof KeyRound }
 export function ModeTabs({ activeTab, onChange }: ModeTabsProps) {
   return (
     <div
-      className="cyber-panel grid grid-cols-2 gap-1.5 rounded-2xl p-1.5 sm:grid-cols-4"
+      className="cyber-panel grid grid-cols-2 gap-1.5 rounded-2xl p-1.5 sm:grid-cols-3 lg:grid-cols-5"
       role="tablist"
     >
       {TABS.map((tab) => {
