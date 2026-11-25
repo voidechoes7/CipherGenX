@@ -22,7 +22,7 @@ export function PrivacyFooter() {
         </span>
       </div>
       <div className="text-slate-500">
-        © 2026 CipherGenX v1.1.0 — Private Personal Use
+        © 2026 CipherGenX v1.1.1 — Private Personal Use
       </div>
     </footer>
   );

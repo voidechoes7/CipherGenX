@@ -1,23 +1,23 @@
-# CipherGen (`CipherGenX`) v1.1.0
+# CipherGen (`CipherGenX`) v1.1.1
 
 Suite criptográfica independiente, **100% offline**, ultra segura y sin telemetría construida con **Rust puro (`#![forbid(unsafe_code)]`)** y **Tauri 2** para **Windows (`.exe`)**, **Android (`.apk`)**, **iOS (`.ipa` sin firmar)** y **Linux (`.deb` / `.AppImage`)**.
 
 ---
 
-## Descargas Directas — Release `v1.1.0`
+## Descargas Directas — Release `v1.1.1`
 
 | Plataforma | Archivo | Descarga Directa |
 | --- | --- | --- |
-| **Android** | Universal APK firmado (`.apk`) | [CipherGen_1.1.0_Android_universal-signed.apk](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/CipherGen_1.1.0_Android_universal-signed.apk) |
-| **iOS** | IPA sin firmar para AltStore / Sideloadly / Xcode (`.ipa`) | [CipherGen_1.1.0_iOS-unsigned.ipa](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/CipherGen_1.1.0_iOS-unsigned.ipa) |
-| **Windows (x64)** | Instalador NSIS (`.exe`) | [CipherGen_1.1.0_x64-setup.exe](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/CipherGen_1.1.0_x64-setup.exe) |
-| **Linux (Debian/Ubuntu)** | Paquete `.deb` | [CipherGen_1.1.0_amd64.deb](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/CipherGen_1.1.0_amd64.deb) |
-| **Linux (Universal)** | Portable `.AppImage` | [CipherGen_1.1.0_amd64.AppImage](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/CipherGen_1.1.0_amd64.AppImage) |
-| **Verificación** | Sumas SHA-256 | [SHA256SUMS.txt](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.0/SHA256SUMS.txt) |
+| **Android** | Universal APK firmado (`.apk`) | [CipherGen_1.1.1_Android_universal-signed.apk](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.1/CipherGen_1.1.1_Android_universal-signed.apk) |
+| **iOS** | IPA sin firmar para AltStore / Sideloadly / Xcode (`.ipa`) | [CipherGen_1.1.1_iOS-unsigned.ipa](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.1/CipherGen_1.1.1_iOS-unsigned.ipa) |
+| **Windows (x64)** | Instalador NSIS (`.exe`) | [CipherGen_1.1.1_x64-setup.exe](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.1/CipherGen_1.1.1_x64-setup.exe) |
+| **Linux (Debian/Ubuntu)** | Paquete `.deb` | [CipherGen_1.1.1_amd64.deb](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.1/CipherGen_1.1.1_amd64.deb) |
+| **Linux (Universal)** | Portable `.AppImage` | [CipherGen_1.1.1_amd64.AppImage](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.1/CipherGen_1.1.1_amd64.AppImage) |
+| **Verificación** | Sumas SHA-256 | [SHA256SUMS.txt](https://github.com/voidechoes7/CipherGenX/releases/download/v1.1.1/SHA256SUMS.txt) |
 
 ---
 
-## Novedades Principales en v1.1.0
+## Novedades Principales en v1.1.1
 
 1. **Bóveda Determinista Argon2id (Stateless)**:
    - Derivación determinista con **Argon2id v19 (`64 MiB`, `t=3`, `p=1`)** + DRBG SHA-256 sin sesgo.

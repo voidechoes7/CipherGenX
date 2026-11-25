@@ -58,7 +58,7 @@ export function Header({
         >
           <img
             src="/logo.png"
-            alt="CipherGenX Neon Cyber Shield"
+            alt="CipherGenX Quantum Vault Core"
             className="h-full w-full object-cover"
           />
         </div>
@@ -75,7 +75,7 @@ export function Header({
                 border: "1px solid var(--border-accent)",
               }}
             >
-              v1.1.0
+              v1.1.1
             </span>
           </div>
           <p className="text-xs text-slate-400">
